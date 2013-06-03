@@ -1,2 +1,3 @@
 ./
 git://github.com/k0001/pipes-attoparsec.git master
+git://github.com/Gabriel439/Haskell-Pipes-ByteString-Library.git master
