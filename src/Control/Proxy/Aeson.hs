@@ -19,6 +19,7 @@ module Control.Proxy.Aeson
     -- ** Lower level parsing
   , parseJSON
   , parseJSOND
+  , parseValue
   , parseValueD
   ) where
 
@@ -71,7 +72,8 @@ instance Exception DecodingError
 -- "Control.Proxy.Trans.Either" to recover from them.
 --
 -- If instead you want to perform each of the decoding steps separately, you
--- should use instead the 'parseJSON', 'parseJSOND' and 'parseValueD' proxies.
+-- should use instead the 'parseJSON', 'parseJSOND', 'parseValue' or
+-- 'parseValueD' proxies.
 
 
 -- | Decodes one JSON value flowing downstream.
@@ -198,9 +200,10 @@ parseValue = \x -> do
     case Ae.fromJSON v of
       Ae.Error e   -> P.throw e
       Ae.Success r -> return r
-{-# INLINE parseValue #-}
+{-# INLINABLE parseValue #-}
 
--- | Converts Aeson 'Ae.Value's flowing downstream to a 'Ae.FromJSON' instance.
+-- | Converts Aeson 'Ae.Value's flowing downstream to a 'Ae.FromJSON' instance
+-- and forwards it downstream.
 --
 -- In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
@@ -230,7 +233,7 @@ encode = \r -> P.runIdentityP $ do
 
 
 -- | Encodes 'Ae.ToJSON' instances flowing downstream, each in possibly more
--- than one 'BS.ByteString' chunks.
+-- than one 'BS.ByteString' chunk, and sends each chunks downstream.
 encodeD
   :: (P.Proxy p, Monad m, Ae.ToJSON a)
   => () -> P.Pipe p a B.ByteString m r
