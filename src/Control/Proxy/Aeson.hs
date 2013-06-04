@@ -19,7 +19,6 @@ module Control.Proxy.Aeson
     -- ** Lower level parsing
   , parseJSON
   , parseJSOND
-  , parseValue
   , parseValueD
   ) where
 
@@ -72,8 +71,8 @@ instance Exception DecodingError
 -- "Control.Proxy.Trans.Either" to recover from them.
 --
 -- If instead you want to perform each of the decoding steps separately, perhaps
--- for efficiency reasons, you should use instead the 'parseJSON', 'parseJSOND',
--- 'parseValue' and 'parseValueD' proxies.
+-- for efficiency reasons, you should use instead the 'parseJSON', 'parseJSOND'
+-- and 'parseValueD' proxies.
 
 
 -- | Decodes one JSON value flowing downstream.
@@ -200,7 +199,7 @@ parseValue = \x -> do
     case Ae.fromJSON v of
       Ae.Error e   -> P.throw e
       Ae.Success r -> return r
-{-# INLINABLE parseValue #-}
+{-# INLINE parseValue #-}
 
 -- | Converts Aeson 'Ae.Value's flowing downstream to a 'Ae.FromJSON' instance.
 --
