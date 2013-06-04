@@ -70,9 +70,8 @@ instance Exception DecodingError
 -- errors, you might use any of the facilities exported by
 -- "Control.Proxy.Trans.Either" to recover from them.
 --
--- If instead you want to perform each of the decoding steps separately, perhaps
--- for efficiency reasons, you should use instead the 'parseJSON', 'parseJSOND'
--- and 'parseValueD' proxies.
+-- If instead you want to perform each of the decoding steps separately, you
+-- should use instead the 'parseJSON', 'parseJSOND' and 'parseValueD' proxies.
 
 
 -- | Decodes one JSON value flowing downstream.
