@@ -29,10 +29,13 @@ library
   exposed-modules: Control.Proxy.Aeson
   build-depends:
       aeson            (>=0.6.1 && < 0.7)
+    , attoparsec
     , base             (>=4.5   && < 5.0)
     , pipes            (>=3.3   && <3.4)
     , pipes-attoparsec (>=0.2   && <0.3)
     , bytestring       (>=0.9.2.1)
     , text
     , transformers     (>=0.2 && <=0.4)
+    , pipes-bytestring
+    , pipes-parse
   ghc-options: -Wall -O2
