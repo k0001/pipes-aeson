@@ -7,35 +7,40 @@
 -- you have read "Control.Proxy.Parse.Tutorial".
 
 module Control.Proxy.Aeson
-  ( -- * Encoding
+  ( -- * Top level JSON values
+    -- $top-level-value
+    TopLevelValue(..)
+  , topLevelValue
+  , isTopLevelValue
+    -- * Encoding
     -- $encoding
-    encode
+  , encode
   , encodeD
     -- * Decoding
     -- $decoding
   , decode
   , decodeD
-  , DecodingError(..)
     -- ** Lower level parsing
-  , parseJSON
-  , parseJSOND
   , parseValue
   , parseValueD
+  , fromValue
+  , fromValueD
+    -- * Types
+  , DecodingError(..)
   ) where
+
 
 import           Control.Exception             (Exception)
 import           Control.Monad                 (unless)
 import qualified Control.Proxy                 as P
+import qualified Control.Proxy.Aeson.Internal  as I
 import qualified Control.Proxy.Attoparsec      as PA
-import qualified Control.Proxy.Parse           as Pp
 import qualified Control.Proxy.Trans.Either    as P
 import qualified Control.Proxy.Trans.State     as P
 import qualified Data.Aeson                    as Ae
 import qualified Data.ByteString.Char8         as B
-import qualified Data.ByteString.Lazy.Internal as BLI
-import qualified Data.Char                     as Char
 import           Data.Data                     (Data, Typeable)
-import           Data.Function                 (fix)
+import           Data.Maybe                    (fromJust)
 
 --------------------------------------------------------------------------------
 
@@ -51,16 +56,87 @@ data DecodingError
 instance Exception DecodingError
 
 --------------------------------------------------------------------------------
+-- $top-level-value
+--
+-- The JSON RFC-4627 standard only allows 'Ae.Array' or 'Ae.Object' values as
+-- top-level. The 'TopLevelValue' used throughout this module in replacement for
+-- Aesons's 'Ae.Value' enforces that restricion in a type-safe manner.
+--
+-- If you want to ignore the standard and encode or decode any 'Ae.Value', then
+-- use the facilities exported by the "Control.Proxy.Aeson.Unsafe" module.
+--
+-- * You may use the 'topLevelValue' function to convert a 'Ae.Value' to a
+-- 'TopLevelValue' if possible.
+--
+-- * Use the 'Ae.toJSON' method on a 'TopLevelValue' to obtain its underlying
+-- 'Ae.Value'.
+
+
+-- | A JSON top-level value must be an 'Ae.Object' or an 'Ae.Array', according
+-- to RFC-4627.
+data TopLevelValue
+  = Object !Ae.Object
+  | Array  !Ae.Array
+  deriving (Show, Eq)
+
+instance Ae.ToJSON TopLevelValue where
+  toJSON (Object o) = Ae.Object o
+  toJSON (Array  a) = Ae.Array  a
+
+instance Ae.FromJSON TopLevelValue where
+  parseJSON (Ae.Object o) = return (Object o)
+  parseJSON (Ae.Array a)  = return (Array a)
+  parseJSON _             = fail "Not a valid top-level value"
+
+-- | Converts the given 'Ae.Value' to a 'TopLevelValue' as long as it is one of
+-- 'Ae.Object' or 'Ae.Array', otherwise 'Nothing'.
+topLevelValue :: Ae.Value -> Maybe TopLevelValue
+topLevelValue (Ae.Object o) = Just (Object o)
+topLevelValue (Ae.Array a)  = Just (Array a)
+topLevelValue _             = Nothing
+
+-- | Checks whether the given 'Ae.Value' is one of 'Ae.Object' or 'Ae.Array'.
+isTopLevelValue :: Ae.Value -> Bool
+isTopLevelValue (Ae.Object _) = True
+isTopLevelValue (Ae.Array _)  = True
+isTopLevelValue _             = False
+
+--------------------------------------------------------------------------------
+-- $encoding
+--
+-- There are two different JSON encoding facilities exported by this module, and
+-- choosing between them is easy: If you need to interleave JSON encoding
+-- with other stream effects you must use 'encode', otherwise you may use the
+-- simpler 'encodeD'.
+--
+-- Both encoding proxies enforce the JSON RFC-4627 requirement that top-level
+-- values are either 'Ae.Array's or 'Ae.Object's, as witnessed by the
+-- 'TopLevelValue' type. However, if you need to ignore this requirement you may
+-- use the similar encoding proxies exported by the "Control.Proxy.Aeson.Unsafe"
+-- module.
+
+-- | Encodes the given 'TopLevelValue' as JSON and sends it downstream, possibly
+-- in more than one 'BS.ByteString' chunk.
+encode :: (P.Proxy p, Monad m) => TopLevelValue -> p x' x () B.ByteString m ()
+encode = I.fromLazy . Ae.encode
+
+-- | Encodes 'TopLevelValue's flowing downstream as JSON, each in possibly more
+-- than one 'BS.ByteString' chunk, and sends each chunk downstream.
+encodeD :: (P.Proxy p, Monad m) => () -> P.Pipe p TopLevelValue B.ByteString m r
+encodeD = P.pull P./>/ encode
+
+--------------------------------------------------------------------------------
 -- $decoding
 --
--- /JSON decoding/ in Haskell involves two different steps:
+-- Decoding a JSON value as a Haskell type in involves two different steps:
 --
--- * Parsing a raw JSON 'B.ByteString' as an Aeson 'Ae.Value'.
+-- * Parsing a raw JSON 'B.ByteString' into a 'TopLevelValue'.
 --
--- * Converting the obtained Aeson 'Ae.Value' to a 'Ae.FromJSON' instance.
+-- * Converting the obtained 'TopLevelValue' to the desired type, which must be
+-- a 'Ae.FromJSON' instance.
 --
 -- Any of those steps can fail, and in case of errors, the 'DecodingError' type
--- explicitly states the step at which the error happened.
+-- explicitly states at which the step the error happened.
 --
 -- There are two different JSON decoding facilities exported by this module,
 -- both perform those steps at once. Choosing between them is easy: If you
@@ -71,9 +147,9 @@ instance Exception DecodingError
 -- errors, you might use any of the facilities exported by
 -- "Control.Proxy.Trans.Either" to recover from them.
 --
--- If instead you want to perform each of the decoding steps separately, you
--- should use instead the 'parseJSON', 'parseJSOND', 'parseValue' or
--- 'parseValueD' proxies.
+-- If you prefer to perform each of the decoding steps separately, you
+-- could use instead the 'parseValue', 'parseValueD', 'fromValue' or
+-- 'fromValueD' proxies.
 
 
 -- | Decodes one JSON value flowing downstream.
@@ -101,7 +177,7 @@ instance Exception DecodingError
 -- >         -- 4. Start all over again.
 -- >         loop
 
--- We could implemente 'decode' in terms of 'parseJSON' and 'parseValue', but
+-- We could implemente 'decode' in terms of 'parseValue' and 'fromValue', but
 -- this is arguably more efficient and readable.
 decode
   :: (Monad m, P.Proxy p, Ae.FromJSON r)
@@ -117,6 +193,7 @@ decode = do
           Ae.Success r -> return r
 {-# INLINABLE decode #-}
 
+
 -- | Decodes consecutive JSON values flowing downstream until end of input.
 --
 -- * In case of decoding errors, a 'DecodingError' exception is thrown in
@@ -131,16 +208,15 @@ decodeD
   => ()
   -> P.Pipe (P.EitherP DecodingError (P.StateP [B.ByteString] p))
      (Maybe B.ByteString) b m ()
-decodeD = \() -> loop
-  where
+decodeD = \() -> loop where
     loop = do
-        eof <- P.liftP $ skipSpace >> PA.isEndOfParserInput
+        eof <- P.liftP $ I.skipSpace >> PA.isEndOfParserInput
         unless eof $ decode >>= P.respond >> loop
 {-# INLINABLE decodeD #-}
 
 --------------------------------------------------------------------------------
 
--- | Parses a raw JSON 'B.ByteString' as an Aeson 'Ae.Value'.
+-- | Parses a JSON value flowing downstream into a 'TopLevelValue'.
 --
 -- * In case of parsing errors, a 'PA.ParsingError' exception is thrown in
 -- the 'Pe.EitherP' proxy transformer.
@@ -152,16 +228,16 @@ decodeD = \() -> loop
 --
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
-parseJSON
+parseValue
   :: (Monad m, P.Proxy p)
   => P.EitherP PA.ParsingError (P.StateP [B.ByteString] p)
-     () (Maybe B.ByteString) y' y m Ae.Value
-parseJSON = PA.parse Ae.json'
-{-# INLINABLE parseJSON #-}
+     () (Maybe B.ByteString) y' y m TopLevelValue
+parseValue = return . fromJust . topLevelValue =<< PA.parse Ae.json'
+{-# INLINABLE parseValue #-}
 
 
--- | Parses consecutive raw JSON 'B.ByteStrings' flowing downstream as
--- Aeson 'Ae.Value's, until end of input.
+-- | Parses consecutive JSON values flowing downstream as 'TopLevelValue's,
+-- until end of input.
 --
 -- * In case of parsing errors, a 'DecodingError' exception is thrown in
 -- the 'Pe.EitherP' proxy transformer.
@@ -170,92 +246,45 @@ parseJSON = PA.parse Ae.json'
 --
 -- * Empty input chunks flowing downstream and whitespace in between JSON
 -- values will be discarded.
-parseJSOND
+parseValueD
   :: (Monad m, P.Proxy p)
   => ()
   -> P.Pipe (P.EitherP PA.ParsingError (P.StateP [B.ByteString] p))
-     (Maybe B.ByteString) Ae.Value m ()
-parseJSOND = \() -> loop
-  where
+     (Maybe B.ByteString) TopLevelValue m ()
+parseValueD = \() -> loop where
     loop = do
-        eof <- P.liftP $ skipSpace >> PA.isEndOfParserInput
-        unless eof $ parseJSON >>= P.respond >> loop
-{-# INLINABLE parseJSOND #-}
+        eof <- P.liftP $ I.skipSpace >> PA.isEndOfParserInput
+        unless eof $ parseValue >>= P.respond >> loop
+{-# INLINABLE parseValueD #-}
 
 --------------------------------------------------------------------------------
 
--- | Converts an Aeson 'Ae.Value' flowing downstream to a 'Ae.FromJSON'
--- instance.
+-- | Converts a 'Ae.Value' flowing downstream to a 'Ae.FromJSON' instance.
 --
 -- In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
 --
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
-parseValue
+fromValue
   :: (Monad m, P.Proxy p, Ae.FromJSON r)
   => x -> P.EitherP String p x Ae.Value y' y m r
-parseValue = \x -> do
+fromValue = \x -> do
     v <- P.request x
     case Ae.fromJSON v of
       Ae.Error e   -> P.throw e
       Ae.Success r -> return r
-{-# INLINABLE parseValue #-}
+{-# INLINABLE fromValue #-}
 
--- | Converts Aeson 'Ae.Value's flowing downstream to a 'Ae.FromJSON' instance
--- and forwards it downstream.
+
+-- | Converts 'Ae.Value's flowing downstream to 'Ae.FromJSON' instances and
+-- forwards them downstream.
 --
 -- In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
-parseValueD
+fromValueD
   :: (Monad m, P.Proxy p, Ae.FromJSON b)
   => x -> P.EitherP String p x Ae.Value x b m r
-parseValueD = parseValue P.\>\ P.pull
-{-# INLINABLE parseValueD #-}
+fromValueD = fromValue P.\>\ P.pull
+{-# INLINABLE fromValueD #-}
 
-
---------------------------------------------------------------------------------
--- $encoding
---
--- There are two different JSON encoding facilities exported by this module, and
--- choosing between them is easy: If you need to interleave JSON encoding
--- with other stream effects you must use 'encode', otherwise you may use the
--- simpler 'encodeD'.
-
--- | Encodes the given 'Ae.ToJSON' instance and sends it downstream, possibly in
--- more than one 'BS.ByteString' chunks.
-encode
-  :: (P.Proxy p, Monad m, Ae.ToJSON r)
-  => r -> p x' x () B.ByteString m ()
-encode = \r -> P.runIdentityP $ do
-    BLI.foldrChunks (\e a -> P.respond e >> a) (return ()) (Ae.encode r)
-{-# INLINABLE encode #-}
-
-
--- | Encodes 'Ae.ToJSON' instances flowing downstream, each in possibly more
--- than one 'BS.ByteString' chunk, and sends each chunks downstream.
-encodeD
-  :: (P.Proxy p, Monad m, Ae.ToJSON a)
-  => () -> P.Pipe p a B.ByteString m r
-encodeD = P.pull P./>/ encode
-{-# INLINABLE encodeD #-}
-
---------------------------------------------------------------------------------
-
--- | Consume and discard leading 'I.ParserInput' characters from upstream as
--- long as the given predicate holds 'True'.
-
--- XXX: we define 'skipSpace' here until 'pipes-bytestring' is released.
-skipSpace
-  :: (Monad m, P.Proxy p)
-  => P.StateP [B.ByteString] p () (Maybe B.ByteString) y' y m ()
-skipSpace = fix $ \loop -> do
-    ma <- Pp.draw
-    case ma of
-      Nothing -> return ()
-      Just a  -> do
-        let a' = B.dropWhile Char.isSpace a
-        if B.null a'
-           then loop
-           else Pp.unDraw a'
-{-# INLINABLE skipSpace #-}
