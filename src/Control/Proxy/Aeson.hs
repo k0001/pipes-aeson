@@ -166,7 +166,14 @@ decode
   :: (Monad m, P.Proxy p, Ae.FromJSON r)
   => P.EitherP I.DecodingError (P.StateP [B.ByteString] p)
      () (Maybe B.ByteString) y' y m r
-decode = U.decode
+decode = do
+    ev <- P.liftP . P.runEitherP $ PA.parse Ae.json'
+    case ev of
+      Left e  -> P.throw (I.ParserError e)
+      Right v ->
+        case Ae.fromJSON v of
+          Ae.Error e   -> P.throw (I.ValueError e)
+          Ae.Success r -> return r
 {-# INLINABLE decode #-}
 
 
@@ -184,7 +191,10 @@ decodeD
   => ()
   -> P.Pipe (P.EitherP I.DecodingError (P.StateP [B.ByteString] p))
      (Maybe B.ByteString) b m ()
-decodeD = U.decodeD
+decodeD = \() -> loop where
+    loop = do
+        eof <- P.liftP $ I.skipSpace >> PA.isEndOfParserInput
+        unless eof $ decode >>= P.respond >> loop
 {-# INLINABLE decodeD #-}
 
 --------------------------------------------------------------------------------
