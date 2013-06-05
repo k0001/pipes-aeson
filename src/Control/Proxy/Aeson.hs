@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-
 -- | This module allows you to encode and decode JSON values flowing downstream
 -- through Pipes streams, possibly interleaving other stream effects.
 --
@@ -26,34 +24,20 @@ module Control.Proxy.Aeson
   , fromValue
   , fromValueD
     -- * Types
-  , DecodingError(..)
+  , I.DecodingError(..)
   ) where
 
 
-import           Control.Exception             (Exception)
 import           Control.Monad                 (unless)
 import qualified Control.Proxy                 as P
 import qualified Control.Proxy.Aeson.Internal  as I
+import qualified Control.Proxy.Aeson.Unsafe    as U
 import qualified Control.Proxy.Attoparsec      as PA
 import qualified Control.Proxy.Trans.Either    as P
 import qualified Control.Proxy.Trans.State     as P
 import qualified Data.Aeson                    as Ae
 import qualified Data.ByteString.Char8         as B
-import           Data.Data                     (Data, Typeable)
 import           Data.Maybe                    (fromJust)
-
---------------------------------------------------------------------------------
-
--- | An error while decoding a JSON value.
-data DecodingError
-  = ParserError PA.ParsingError
-    -- ^An Attoparsec error that happened while parsing the raw JSON string.
-  | ValueError String
-    -- ^An Aeson error that happened while trying to convert a 'Ae.Value' to
-    --  an 'A.FromJSON' instance, as reported by 'Ae.Error'.
-  deriving (Show, Eq, Data, Typeable)
-
-instance Exception DecodingError
 
 --------------------------------------------------------------------------------
 -- $top-level-value
@@ -118,12 +102,14 @@ isTopLevelValue _             = False
 -- | Encodes the given 'TopLevelValue' as JSON and sends it downstream, possibly
 -- in more than one 'BS.ByteString' chunk.
 encode :: (P.Proxy p, Monad m) => TopLevelValue -> p x' x () B.ByteString m ()
-encode = I.fromLazy . Ae.encode
+encode = U.encode
+{-# INLINABLE encode #-}
 
 -- | Encodes 'TopLevelValue's flowing downstream as JSON, each in possibly more
 -- than one 'BS.ByteString' chunk, and sends each chunk downstream.
 encodeD :: (P.Proxy p, Monad m) => () -> P.Pipe p TopLevelValue B.ByteString m r
-encodeD = P.pull P./>/ encode
+encodeD = U.encodeD
+{-# INLINABLE encodeD #-}
 
 --------------------------------------------------------------------------------
 -- $decoding
@@ -176,21 +162,11 @@ encodeD = P.pull P./>/ encode
 -- >         --    some more stream effects.
 -- >         -- 4. Start all over again.
 -- >         loop
-
--- We could implemente 'decode' in terms of 'parseValue' and 'fromValue', but
--- this is arguably more efficient and readable.
 decode
   :: (Monad m, P.Proxy p, Ae.FromJSON r)
-  => P.EitherP DecodingError (P.StateP [B.ByteString] p)
+  => P.EitherP I.DecodingError (P.StateP [B.ByteString] p)
      () (Maybe B.ByteString) y' y m r
-decode = do
-    ev <- P.liftP . P.runEitherP $ PA.parse Ae.json'
-    case ev of
-      Left e  -> P.throw (ParserError e)
-      Right v ->
-        case Ae.fromJSON v of
-          Ae.Error e   -> P.throw (ValueError e)
-          Ae.Success r -> return r
+decode = U.decode
 {-# INLINABLE decode #-}
 
 
@@ -206,12 +182,9 @@ decode = do
 decodeD
   :: (Monad m, P.Proxy p, Ae.FromJSON b)
   => ()
-  -> P.Pipe (P.EitherP DecodingError (P.StateP [B.ByteString] p))
+  -> P.Pipe (P.EitherP I.DecodingError (P.StateP [B.ByteString] p))
      (Maybe B.ByteString) b m ()
-decodeD = \() -> loop where
-    loop = do
-        eof <- P.liftP $ I.skipSpace >> PA.isEndOfParserInput
-        unless eof $ decode >>= P.respond >> loop
+decodeD = U.decodeD
 {-# INLINABLE decodeD #-}
 
 --------------------------------------------------------------------------------
@@ -259,10 +232,11 @@ parseValueD = \() -> loop where
 
 --------------------------------------------------------------------------------
 
--- | Converts a 'Ae.Value' flowing downstream to a 'Ae.FromJSON' instance.
+-- | Converts any 'Ae.Value' flowing downstream to a 'Ae.FromJSON' instance.
 --
 -- In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
+--
 --
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
@@ -277,7 +251,7 @@ fromValue = \x -> do
 {-# INLINABLE fromValue #-}
 
 
--- | Converts 'Ae.Value's flowing downstream to 'Ae.FromJSON' instances and
+-- | Converts any 'Ae.Value's flowing downstream to 'Ae.FromJSON' instances and
 -- forwards them downstream.
 --
 -- In case of parsing errors, a 'String' exception holding the value provided
