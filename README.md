@@ -1,6 +1,6 @@
 # pipes-aeson
 
-Utilities to encode or decode **JSON** input on **Pipes** streams using
+Utilities to encode and decode streams of **JSON** values using **Pipes** and
 **Aeson**.
 
 Check the source or rendered Haddocks for documentation.
