@@ -1,8 +1,8 @@
 -- | This module allows you to encode and decode JSON values flowing downstream
 -- through Pipes streams, possibly interleaving other stream effects.
 --
--- This module builds on top of the @pipes-parse@ package and assumes
--- you have read "Control.Proxy.Parse.Tutorial".
+-- This module builds on top of the @pipes-parse@ and @pipes-attoparsec@
+-- packages and assumes you have read "Control.Proxy.Parse.Tutorial".
 
 module Control.Proxy.Aeson
   ( -- * Top level JSON values
@@ -50,11 +50,11 @@ import           Data.Maybe                    (fromJust)
 -- use the facilities exported by the "Control.Proxy.Aeson.Unsafe" module.
 --
 -- * You may use the 'toTopLevelValue' function to convert any 'Ae.ToJSON'
--- instance to a 'TopLevelValue', if possible. Remembr that 'Ae.Value' is
--- such instance.
+-- instance to a 'TopLevelValue', if possible. Remember that 'Ae.Value' is
+-- one such instance.
 --
 -- * Use the 'Ae.toJSON' method on a 'TopLevelValue' to obtain its underlying
--- 'Ae.Value'.
+-- 'Ae.Value' representation.
 
 
 -- | A JSON top-level value must be an 'Ae.Object' or an 'Ae.Array', according
@@ -120,8 +120,8 @@ encodeD = U.encodeD
 -- * Converting the obtained 'TopLevelValue' to the desired type, which must be
 -- a 'Ae.FromJSON' instance.
 --
--- Any of those steps can fail, and in case of errors, the 'DecodingError' type
--- explicitly states at which the step the error happened.
+-- Any of those steps can fail, and in case of errors, the 'I.DecodingError'
+-- type explicitly states at which the step the error happened.
 --
 -- There are two different JSON decoding facilities exported by this module,
 -- both perform those steps at once. Choosing between them is easy: If you
@@ -139,7 +139,7 @@ encodeD = U.encodeD
 
 -- | Decodes one JSON value flowing downstream.
 --
--- * In case of decoding errors, a 'DecodingError' exception is thrown in
+-- * In case of decoding errors, a 'I.DecodingError' exception is thrown in
 -- the 'Pe.EitherP' proxy transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
@@ -150,17 +150,19 @@ encodeD = U.encodeD
 -- Here is an example parsing loop that allows interleaving stream effects
 -- together with 'decode':
 --
--- > loop = do
--- >     -- Skip any leading whitespace and check that we haven't reached EOF.
--- >     eof <- liftP $ skipSpace >> isEndOfParserInput
--- >     unless eof $ do
--- >         -- 1. Possibly perform some stream effects here.
--- >         -- 2. Decode one JSON element from the stream.
--- >         exampleElement <- decode
--- >         -- 3. Do something with exampleElement and possibly perform
--- >         --    some more stream effects.
--- >         -- 4. Start all over again.
--- >         loop
+-- @
+--   loop = do
+--       -- Skip any leading whitespace and check that we haven't reached EOF.
+--       eof &#x3c;- 'P.liftP' $ 'Control.Proxy.ByteString.dropWhile' 'Data.Char.isSpace' >> 'PA.isEndOfParserInput'
+--       'unless' eof $ do
+--           -- 1. Possibly perform some stream effects here.
+--           -- 2. Decode one JSON element from the stream.
+--           exampleElement <- 'decode'
+--           -- 3. Do something with exampleElement and possibly perform
+--           --    some more stream effects.
+--           -- 4. Start all over again.
+--           loop
+-- @
 decode
   :: (Monad m, P.Proxy p, Ae.FromJSON r)
   => P.EitherP I.DecodingError (P.StateP [B.ByteString] p)
@@ -178,7 +180,7 @@ decode = do
 
 -- | Decodes consecutive JSON values flowing downstream until end of input.
 --
--- * In case of decoding errors, a 'DecodingError' exception is thrown in
+-- * In case of decoding errors, a 'I.DecodingError' exception is thrown in
 -- the 'Pe.EitherP' proxy transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
@@ -221,7 +223,7 @@ parseValue = return . fromJust . toTopLevelValue =<< PA.parse Ae.json'
 -- | Parses consecutive JSON values flowing downstream as 'TopLevelValue's,
 -- until end of input.
 --
--- * In case of parsing errors, a 'DecodingError' exception is thrown in
+-- * In case of parsing errors, a 'I.DecodingError' exception is thrown in
 -- the 'Pe.EitherP' proxy transformer.
 --
 -- * Requests more input from upstream using 'Pa.draw' when needed.
@@ -243,9 +245,8 @@ parseValueD = \() -> loop where
 
 -- | Converts any 'Ae.Value' flowing downstream to a 'Ae.FromJSON' instance.
 --
--- In case of parsing errors, a 'String' exception holding the value provided
+-- * In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
---
 --
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
@@ -263,7 +264,7 @@ fromValue = \x -> do
 -- | Converts any 'Ae.Value's flowing downstream to 'Ae.FromJSON' instances and
 -- forwards them downstream.
 --
--- In case of parsing errors, a 'String' exception holding the value provided
+-- * In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
 fromValueD
   :: (Monad m, P.Proxy p, Ae.FromJSON b)

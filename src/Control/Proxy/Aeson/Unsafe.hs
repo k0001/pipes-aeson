@@ -1,7 +1,8 @@
 -- | This module exports facilities similar to those exported by the
 -- "Control.Proxy.Aeson" module, except they do not restrict the 'Ae.Value's
--- that might be encoded or decoded to only valid top-level values, according to
--- the RFC-4627 JSON standard. That is, 'Ae.Object's or 'Ae.Array's.
+-- that might be encoded or decoded to be just valid top-level values. That is,
+-- not only 'Ae.Object's or 'Ae.Array's, according to to the RFC-4627 JSON
+-- standard.
 
 module Control.Proxy.Aeson.Unsafe
   (-- * Encoding

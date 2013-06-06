@@ -15,7 +15,8 @@ cabal-version:      >=1.8
 synopsis:           Encode and decode JSON streams using aeson and pipes.
 extra-source-files: README.md PEOPLE NEWS
 description:
-  Utilities to encode and decode JSON streams using @aeson@ and @pipes@.
+  Utilities to encode and decode JSON streams using @aeson@ and @pipes@,
+  possibly interleaving other stream effects too.
   .
   See the @NEWS@ file in the source distribution to learn about any
   important changes between version.
