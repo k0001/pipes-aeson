@@ -42,8 +42,9 @@ import           Data.Maybe                    (fromJust)
 -- $top-level-value
 --
 -- The JSON RFC-4627 standard only allows 'Ae.Array' or 'Ae.Object' values as
--- top-level. The 'TopLevelValue' used throughout this module in replacement for
--- Aesons's 'Ae.Value' enforces that restricion in a type-safe manner.
+-- top-level. The 'TopLevelValue' type used throughout this module in
+-- replacement of Aesons's 'Ae.Value' enforces that restricion in a type-safe
+-- manner.
 --
 -- If you want to ignore the standard and encode or decode any 'Ae.Value', then
 -- use the facilities exported by the "Control.Proxy.Aeson.Unsafe" module.
