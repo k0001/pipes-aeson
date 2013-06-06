@@ -49,7 +49,7 @@ import           Data.Maybe                    (fromJust)
 -- use the facilities exported by the "Control.Proxy.Aeson.Unsafe" module.
 --
 -- * You may use the 'toTopLevelValue' function to convert any 'Ae.ToJSON'
--- instance to a 'TopLevelValue', if possible. Remembr that 'Ae.Value' is one
+-- instance to a 'TopLevelValue', if possible. Remembr that 'Ae.Value' is
 -- such instance.
 --
 -- * Use the 'Ae.toJSON' method on a 'TopLevelValue' to obtain its underlying
@@ -74,7 +74,7 @@ instance Ae.FromJSON TopLevelValue where
 
 -- | Converts the given 'Ae.ToJSON' instance to a 'TopLevelValue' as long as its
 -- 'Ae.Value' representation is one of 'Ae.Object' or 'Ae.Array', otherwise
--- 'Nothing'. Remember that 'Ae.Value' itself is an 'Ae.ToJSON' instance.
+-- 'Nothing'. Remember that 'Ae.Value' itself is a 'Ae.ToJSON' instance.
 toTopLevelValue :: Ae.ToJSON a => a -> Maybe TopLevelValue
 toTopLevelValue = \a ->
     case Ae.toJSON a of
