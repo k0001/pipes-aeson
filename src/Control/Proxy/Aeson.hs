@@ -8,8 +8,7 @@ module Control.Proxy.Aeson
   ( -- * Top level JSON values
     -- $top-level-value
     TopLevelValue(..)
-  , topLevelValue
-  , isTopLevelValue
+  , toTopLevelValue
     -- * Encoding
     -- $encoding
   , encode
@@ -49,8 +48,9 @@ import           Data.Maybe                    (fromJust)
 -- If you want to ignore the standard and encode or decode any 'Ae.Value', then
 -- use the facilities exported by the "Control.Proxy.Aeson.Unsafe" module.
 --
--- * You may use the 'topLevelValue' function to convert a 'Ae.Value' to a
--- 'TopLevelValue' if possible.
+-- * You may use the 'toTopLevelValue' function to convert any 'Ae.ToJSON'
+-- instance to a 'TopLevelValue', if possible. Remembr that 'Ae.Value' is one
+-- such instance.
 --
 -- * Use the 'Ae.toJSON' method on a 'TopLevelValue' to obtain its underlying
 -- 'Ae.Value'.
@@ -72,18 +72,15 @@ instance Ae.FromJSON TopLevelValue where
   parseJSON (Ae.Array a)  = return (Array a)
   parseJSON _             = fail "Not a valid top-level value"
 
--- | Converts the given 'Ae.Value' to a 'TopLevelValue' as long as it is one of
--- 'Ae.Object' or 'Ae.Array', otherwise 'Nothing'.
-topLevelValue :: Ae.Value -> Maybe TopLevelValue
-topLevelValue (Ae.Object o) = Just (Object o)
-topLevelValue (Ae.Array a)  = Just (Array a)
-topLevelValue _             = Nothing
-
--- | Checks whether the given 'Ae.Value' is one of 'Ae.Object' or 'Ae.Array'.
-isTopLevelValue :: Ae.Value -> Bool
-isTopLevelValue (Ae.Object _) = True
-isTopLevelValue (Ae.Array _)  = True
-isTopLevelValue _             = False
+-- | Converts the given 'Ae.ToJSON' instance to a 'TopLevelValue' as long as it
+-- is one of 'Ae.Object' or 'Ae.Array', otherwise 'Nothing'.
+toTopLevelValue :: Ae.ToJSON a => a -> Maybe TopLevelValue
+toTopLevelValue = \a ->
+    case Ae.toJSON a of
+      Ae.Object x -> Just (Object x)
+      Ae.Array  x -> Just (Array  x)
+      _           -> Nothing
+{-# INLINABLE toTopLevelValue #-}
 
 --------------------------------------------------------------------------------
 -- $encoding
@@ -215,7 +212,7 @@ parseValue
   :: (Monad m, P.Proxy p)
   => P.EitherP PA.ParsingError (P.StateP [B.ByteString] p)
      () (Maybe B.ByteString) y' y m TopLevelValue
-parseValue = return . fromJust . topLevelValue =<< PA.parse Ae.json'
+parseValue = return . fromJust . toTopLevelValue =<< PA.parse Ae.json'
 {-# INLINABLE parseValue #-}
 
 
