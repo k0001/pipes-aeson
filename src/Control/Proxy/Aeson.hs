@@ -72,8 +72,9 @@ instance Ae.FromJSON TopLevelValue where
   parseJSON (Ae.Array a)  = return (Array a)
   parseJSON _             = fail "Not a valid top-level value"
 
--- | Converts the given 'Ae.ToJSON' instance to a 'TopLevelValue' as long as it
--- is one of 'Ae.Object' or 'Ae.Array', otherwise 'Nothing'.
+-- | Converts the given 'Ae.ToJSON' instance to a 'TopLevelValue' as long as its
+-- 'Ae.Value' representation is one of 'Ae.Object' or 'Ae.Array', otherwise
+-- 'Nothing'. Remember that 'Ae.Value' itself is an 'Ae.ToJSON' instance.
 toTopLevelValue :: Ae.ToJSON a => a -> Maybe TopLevelValue
 toTopLevelValue = \a ->
     case Ae.toJSON a of
