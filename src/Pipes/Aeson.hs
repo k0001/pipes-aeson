@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
+
 -- | This module allows you to encode and decode JSON values flowing downstream
 -- through Pipes streams, possibly interleaving other stream effects.
 --
@@ -50,7 +51,7 @@ import           Data.Maybe                       (fromJust)
 -- manner.
 --
 -- If you want to ignore the standard and encode or decode any 'Ae.Value', then
--- use the facilities exported by the "Control.Proxy.Aeson.Unsafe" module.
+-- use the facilities exported by the "Pipes.Aeson.Unsafe" module.
 --
 -- * You may use the 'toTopLevelValue' function to convert any 'Ae.ToJSON'
 -- instance to a 'TopLevelValue', if possible. Remember that 'Ae.Value' is
@@ -98,7 +99,7 @@ toTopLevelValue = \a ->
 -- Both encoding proxies enforce the JSON RFC-4627 requirement that top-level
 -- values are either 'Ae.Array's or 'Ae.Object's, as witnessed by the
 -- 'TopLevelValue' type. However, if you need to ignore this requirement you may
--- use the similar encoding proxies exported by the "Control.Proxy.Aeson.Unsafe"
+-- use the similar encoding proxies exported by the "Pipes.Aeson.Unsafe"
 -- module.
 
 -- | Encodes the given 'TopLevelValue' as JSON and sends it downstream, possibly
@@ -131,9 +132,9 @@ encodeD = U.encodeD
 -- need to interleave JSON decoding with other stream effects you must use
 -- 'decode', otherwise you may use the simpler 'decodeD'.
 --
--- These proxies use the 'P.EitherP' proxy transformer to report decoding
+-- These proxies use the 'EitherT' monad transformer to report decoding
 -- errors, you might use any of the facilities exported by
--- "Control.Proxy.Trans.Either" to recover from them.
+-- "Control.Monad.Trans.Either" to recover from them.
 --
 -- If you prefer to perform each of the decoding steps separately, you
 -- could use instead the 'parseValue', 'parseValueD', 'fromValue' or
@@ -143,9 +144,9 @@ encodeD = U.encodeD
 -- | Decodes one JSON value flowing downstream.
 --
 -- * In case of decoding errors, a 'I.DecodingError' exception is thrown in
--- the 'Pe.EitherP' proxy transformer.
+-- the 'EitherT' monad transformer.
 --
--- * Requests more input from upstream using 'Pa.draw' when needed.
+-- * Requests more input from upstream using 'Pp.draw' when needed.
 --
 -- * /Do not/ use this proxy if your stream has leading empty chunks or
 -- whitespace, otherwise you may get unexpected parsing errors.
@@ -156,7 +157,7 @@ encodeD = U.encodeD
 -- @
 --   loop = do
 --       -- Skip any leading whitespace and check that we haven't reached EOF.
---       eof &#x3c;- 'P.liftP' $ 'Control.Proxy.ByteString.dropWhile' 'Data.Char.isSpace' >> 'PA.isEndOfParserInput'
+--       eof &#x3c;- 'hoist' 'lift' $ 'Pipes.ByteString.dropWhile' 'Data.Char.isSpace' >> 'PA.isEndOfParserInput'
 --       'unless' eof $ do
 --           -- 1. Possibly perform some stream effects here.
 --           -- 2. Decode one JSON element from the stream.
@@ -181,9 +182,9 @@ decode = do
 -- | Decodes consecutive JSON values flowing downstream until end of input.
 --
 -- * In case of decoding errors, a 'I.DecodingError' exception is thrown in
--- the 'Pe.EitherP' proxy transformer.
+-- the 'EitherT' monad transformer.
 --
--- * Requests more input from upstream using 'Pa.draw' when needed.
+-- * Requests more input from upstream using 'Pp.draw' when needed.
 --
 -- * Empty input chunks flowing downstream and whitespace in between JSON
 -- values will be discarded.
@@ -203,9 +204,9 @@ decodeD = \() -> loop where
 -- | Parses a JSON value flowing downstream into a 'TopLevelValue'.
 --
 -- * In case of parsing errors, a 'PA.ParsingError' exception is thrown in
--- the 'Pe.EitherP' proxy transformer.
+-- the 'EitherT' monda transformer.
 --
--- * Requests more input from upstream using 'Pa.draw' when needed.
+-- * Requests more input from upstream using 'Pp.draw' when needed.
 --
 -- * /Do not/ use this proxy if your stream has leading empty chunks or
 -- whitespace, otherwise you may get unexpected parsing errors.
@@ -224,9 +225,9 @@ parseValue = return . fromJust . toTopLevelValue =<< PA.parse Ae.json'
 -- until end of input.
 --
 -- * In case of parsing errors, a 'I.DecodingError' exception is thrown in
--- the 'Pe.EitherP' proxy transformer.
+-- the 'EitherT' monad transformer.
 --
--- * Requests more input from upstream using 'Pa.draw' when needed.
+-- * Requests more input from upstream using 'Pp.draw' when needed.
 --
 -- * Empty input chunks flowing downstream and whitespace in between JSON
 -- values will be discarded.
@@ -246,7 +247,7 @@ parseValueD = \() -> loop where
 -- | Converts any 'Ae.Value' flowing downstream to a 'Ae.FromJSON' instance.
 --
 -- * In case of parsing errors, a 'String' exception holding the value provided
--- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
+-- by Aeson's 'Ae.Error' is thrown in the 'EitherT' monad transformer.
 --
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
@@ -264,7 +265,7 @@ fromValue = \x -> do
 -- forwards them downstream.
 --
 -- * In case of parsing errors, a 'String' exception holding the value provided
--- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
+-- by Aeson's 'Ae.Error' is thrown in the 'EitherT' monad transformer.
 fromValueD
   :: (Monad m, Ae.FromJSON b) => x -> Proxy x Ae.Value x b (EitherT String m) r
 fromValueD = fromValue \>\ pull

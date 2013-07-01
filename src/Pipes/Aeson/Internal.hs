@@ -4,7 +4,7 @@
 -- | This module provides internal utilities and it is likely
 -- to be modified in backwards-incompatible ways in the future.
 --
--- Use the stable API exported by the "Control.Proxy.Aeson" module instead.
+-- Use the stable API exported by the "Pipes.Aeson" module instead.
 module Pipes.Aeson.Internal
   ( DecodingError(..)
   , bimapEitherT'
