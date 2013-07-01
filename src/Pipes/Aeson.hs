@@ -1,10 +1,12 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- | This module allows you to encode and decode JSON values flowing downstream
 -- through Pipes streams, possibly interleaving other stream effects.
 --
 -- This module builds on top of the @pipes-parse@ and @pipes-attoparsec@
--- packages and assumes you have read "Control.Proxy.Parse.Tutorial".
+-- packages and assumes you have read "Pipes.Parse.Tutorial".
 
-module Control.Proxy.Aeson
+module Pipes.Aeson
   ( -- * Top level JSON values
     -- $top-level-value
     TopLevelValue(..)
@@ -27,16 +29,17 @@ module Control.Proxy.Aeson
   ) where
 
 
-import           Control.Monad                 (unless)
-import qualified Control.Proxy                 as P
-import qualified Control.Proxy.Aeson.Internal  as I
-import qualified Control.Proxy.Aeson.Unsafe    as U
-import qualified Control.Proxy.Attoparsec      as PA
-import qualified Control.Proxy.Trans.Either    as P
-import qualified Control.Proxy.Trans.State     as P
-import qualified Data.Aeson                    as Ae
-import qualified Data.ByteString.Char8         as B
-import           Data.Maybe                    (fromJust)
+import           Control.Monad                    (unless)
+import           Pipes
+import qualified Pipes.Parse                      as Pp
+import qualified Pipes.Aeson.Internal             as I
+import qualified Pipes.Aeson.Unsafe               as U
+import qualified Pipes.Attoparsec                 as PA
+import           Control.Monad.Trans.Either       (EitherT, left)
+import           Control.Monad.Trans.State.Strict (StateT)
+import qualified Data.Aeson                       as Ae
+import qualified Data.ByteString.Char8            as B
+import           Data.Maybe                       (fromJust)
 
 --------------------------------------------------------------------------------
 -- $top-level-value
@@ -100,13 +103,13 @@ toTopLevelValue = \a ->
 
 -- | Encodes the given 'TopLevelValue' as JSON and sends it downstream, possibly
 -- in more than one 'BS.ByteString' chunk.
-encode :: (P.Proxy p, Monad m) => TopLevelValue -> p x' x () B.ByteString m ()
+encode :: Monad m => TopLevelValue -> Producer B.ByteString m ()
 encode = U.encode
 {-# INLINABLE encode #-}
 
 -- | Encodes 'TopLevelValue's flowing downstream as JSON, each in possibly more
 -- than one 'BS.ByteString' chunk, and sends each chunk downstream.
-encodeD :: (P.Proxy p, Monad m) => () -> P.Pipe p TopLevelValue B.ByteString m r
+encodeD :: Monad m => () -> Pipe TopLevelValue B.ByteString m r
 encodeD = U.encodeD
 {-# INLINABLE encodeD #-}
 
@@ -164,17 +167,14 @@ encodeD = U.encodeD
 --           loop
 -- @
 decode
-  :: (Monad m, P.Proxy p, Ae.FromJSON r)
-  => P.EitherP I.DecodingError (P.StateP [B.ByteString] p)
-     () (Maybe B.ByteString) y' y m r
+  :: (Monad m, Ae.FromJSON r)
+  => Client Pp.Draw (Maybe B.ByteString)
+     (EitherT I.DecodingError (StateT [B.ByteString] m)) r
 decode = do
-    ev <- P.liftP . P.runEitherP $ PA.parse Ae.json'
-    case ev of
-      Left e  -> P.throw (I.ParserError e)
-      Right v ->
-        case Ae.fromJSON v of
-          Ae.Error e   -> P.throw (I.ValueError e)
-          Ae.Success r -> return r
+    v <- hoist (I.bimapEitherT' I.ParserError id) $ PA.parse Ae.json'
+    case Ae.fromJSON v of
+      Ae.Error e   -> lift . left $ I.ValueError e
+      Ae.Success r -> return r
 {-# INLINABLE decode #-}
 
 
@@ -188,14 +188,14 @@ decode = do
 -- * Empty input chunks flowing downstream and whitespace in between JSON
 -- values will be discarded.
 decodeD
-  :: (Monad m, P.Proxy p, Ae.FromJSON b)
+  :: (Monad m, Ae.FromJSON b)
   => ()
-  -> P.Pipe (P.EitherP I.DecodingError (P.StateP [B.ByteString] p))
-     (Maybe B.ByteString) b m ()
+  -> Proxy Pp.Draw (Maybe B.ByteString) () b
+     (EitherT I.DecodingError (StateT [B.ByteString] m)) ()
 decodeD = \() -> loop where
     loop = do
-        eof <- P.liftP $ I.skipSpace >> PA.isEndOfParserInput
-        unless eof $ decode >>= P.respond >> loop
+        eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
+        unless eof $ decode >>= respond >> loop
 {-# INLINABLE decodeD #-}
 
 --------------------------------------------------------------------------------
@@ -213,9 +213,9 @@ decodeD = \() -> loop where
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
 parseValue
-  :: (Monad m, P.Proxy p)
-  => P.EitherP PA.ParsingError (P.StateP [B.ByteString] p)
-     () (Maybe B.ByteString) y' y m TopLevelValue
+  :: Monad m
+  => Client Pp.Draw (Maybe B.ByteString)
+     (EitherT PA.ParsingError (StateT [B.ByteString] m)) TopLevelValue
 parseValue = return . fromJust . toTopLevelValue =<< PA.parse Ae.json'
 {-# INLINABLE parseValue #-}
 
@@ -231,14 +231,14 @@ parseValue = return . fromJust . toTopLevelValue =<< PA.parse Ae.json'
 -- * Empty input chunks flowing downstream and whitespace in between JSON
 -- values will be discarded.
 parseValueD
-  :: (Monad m, P.Proxy p)
+  :: Monad m
   => ()
-  -> P.Pipe (P.EitherP PA.ParsingError (P.StateP [B.ByteString] p))
-     (Maybe B.ByteString) TopLevelValue m ()
+  -> Proxy Pp.Draw (Maybe B.ByteString) () TopLevelValue
+     (EitherT PA.ParsingError (StateT [B.ByteString] m)) ()
 parseValueD = \() -> loop where
     loop = do
-        eof <- P.liftP $ I.skipSpace >> PA.isEndOfParserInput
-        unless eof $ parseValue >>= P.respond >> loop
+        eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
+        unless eof $ parseValue >>= respond >> loop
 {-# INLINABLE parseValueD #-}
 
 --------------------------------------------------------------------------------
@@ -251,12 +251,11 @@ parseValueD = \() -> loop where
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
 fromValue
-  :: (Monad m, P.Proxy p, Ae.FromJSON r)
-  => x -> P.EitherP String p x Ae.Value y' y m r
+  :: (Monad m, Ae.FromJSON r) => x -> Client x Ae.Value (EitherT String m) r
 fromValue = \x -> do
-    v <- P.request x
+    v <- request x
     case Ae.fromJSON v of
-      Ae.Error e   -> P.throw e
+      Ae.Error e   -> lift (left e)
       Ae.Success r -> return r
 {-# INLINABLE fromValue #-}
 
@@ -267,8 +266,7 @@ fromValue = \x -> do
 -- * In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'Pe.EitherP' proxy transformer.
 fromValueD
-  :: (Monad m, P.Proxy p, Ae.FromJSON b)
-  => x -> P.EitherP String p x Ae.Value x b m r
-fromValueD = fromValue P.\>\ P.pull
+  :: (Monad m, Ae.FromJSON b) => x -> Proxy x Ae.Value x b (EitherT String m) r
+fromValueD = fromValue \>\ pull
 {-# INLINABLE fromValueD #-}
 

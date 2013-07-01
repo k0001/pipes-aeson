@@ -1,25 +1,29 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | This module provides internal utilities and it is likely
 -- to be modified in backwards-incompatible ways in the future.
 --
 -- Use the stable API exported by the "Control.Proxy.Aeson" module instead.
-module Control.Proxy.Aeson.Internal
+module Pipes.Aeson.Internal
   ( DecodingError(..)
+  , bimapEitherT'
   , skipSpace
   , fromLazy
   ) where
 
-import qualified Control.Proxy.Attoparsec      as PA
-import qualified Control.Proxy.Trans.State     as P
-import           Control.Exception             (Exception)
-import qualified Control.Proxy                 as P
-import qualified Control.Proxy.Parse           as Pp
-import qualified Data.ByteString.Char8         as B
-import qualified Data.ByteString.Lazy.Internal as BLI
-import qualified Data.Char                     as Char
-import           Data.Data                     (Data, Typeable)
-import           Data.Function                 (fix)
+import           Control.Exception                (Exception)
+import           Control.Monad                    (liftM)
+import qualified Control.Monad.Trans.Either       as E
+import           Control.Monad.Trans.State.Strict (StateT)
+import qualified Data.ByteString.Char8            as B
+import qualified Data.ByteString.Lazy.Internal    as BLI
+import qualified Data.Char                        as Char
+import           Data.Data                        (Data, Typeable)
+import           Data.Function                    (fix)
+import           Pipes
+import qualified Pipes.Attoparsec                 as PA
+import qualified Pipes.Parse                      as Pp
 
 --------------------------------------------------------------------------------
 
@@ -36,13 +40,23 @@ data DecodingError
 instance Exception DecodingError
 
 --------------------------------------------------------------------------------
+
+-- | Like 'E.bimapEitherT', except without the 'Functor' constraint.
+bimapEitherT'
+  :: Monad m => (e -> e') -> (a -> a') -> E.EitherT e m a -> E.EitherT e' m a'
+bimapEitherT' f g = E.EitherT . liftM h . E.runEitherT
+  where
+    h (Left e)  = Left (f e)
+    h (Right a) = Right (g a)
+{-# INLINABLE bimapEitherT' #-}
+
+--------------------------------------------------------------------------------
 -- XXX we define the following proxies here until 'pipes-bytestring' is released
 
 -- | Consumes and discards leading 'I.ParserInput' characters from upstream as
 -- long as the given predicate holds 'True'.
 skipSpace
-  :: (Monad m, P.Proxy p)
-  => P.StateP [B.ByteString] p () (Maybe B.ByteString) y' y m ()
+  :: Monad m => Client Pp.Draw (Maybe B.ByteString) (StateT [B.ByteString] m) ()
 skipSpace = fix $ \loop -> do
     ma <- Pp.draw
     case ma of
@@ -55,9 +69,6 @@ skipSpace = fix $ \loop -> do
 {-# INLINABLE skipSpace #-}
 
 -- Sends each of the 'BLI.ByteString''s strict chunks downstream.
-fromLazy
-  :: (Monad m, P.Proxy p)
-  => BLI.ByteString -> p x' x y' B.ByteString m ()
-fromLazy =
-    P.runIdentityP . BLI.foldrChunks (\e a -> P.respond e >> a) (return ())
+fromLazy :: Monad m => BLI.ByteString -> Server y' B.ByteString m ()
+fromLazy = BLI.foldrChunks (\e a -> respond e >> a) (return ())
 {-# INLINABLE fromLazy #-}
