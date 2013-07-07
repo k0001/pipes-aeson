@@ -9,15 +9,15 @@
 module Pipes.Aeson.Unsafe
   (-- * Encoding
     -- $encoding
-    encode
-  , encodeD
+    encodeOne
+  , encode
     -- * Decoding
     -- $decoding
+  , decodeOne
   , decode
-  , decodeD
     -- ** Lower level parsing
+  , parseValueOne
   , parseValue
-  , parseValueD
     -- * Types
   , I.DecodingError(..)
   ) where
@@ -35,61 +35,61 @@ import qualified Data.ByteString.Char8            as B
 
 --------------------------------------------------------------------------------
 
--- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance.
-encode :: (Monad m, Ae.ToJSON a) => a -> Producer B.ByteString m ()
-encode = I.fromLazy . Ae.encode
-{-# INLINABLE encode #-}
+-- | Like 'Pipes.Aeson.encodeOne', except it accepts any 'Ae.ToJSON' instance.
+encodeOne :: (Monad m, Ae.ToJSON a) => a -> Producer B.ByteString m ()
+encodeOne = I.fromLazy . Ae.encode
+{-# INLINABLE encodeOne #-}
 
--- | Like 'Pipes.Aeson.encodeD', except it accepts any 'Ae.ToJSON' instance.
-encodeD :: (Monad m, Ae.ToJSON a) => () -> Pipe a B.ByteString m r
-encodeD = pull />/ encode
-{-# INLINABLE encodeD #-}
+-- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance.
+encode :: (Monad m, Ae.ToJSON a) => () -> Pipe a B.ByteString m r
+encode = pull />/ encodeOne
+{-# INLINABLE encode #-}
 
 --------------------------------------------------------------------------------
 
--- | Like 'Pipes.Aeson.decode', except it will decode any 'Ae.ToJSON' instance.
-decode
+-- | Like 'Pipes.Aeson.decodeOne', except it will decode any 'Ae.ToJSON' instance.
+decodeOne
   :: (Monad m, Ae.FromJSON r)
   => Client Pp.Draw (Maybe B.ByteString)
      (E.ErrorT I.DecodingError (StateT [B.ByteString] m)) r
-decode = do
+decodeOne = do
     v <- hoist (I.bimapErrorT' I.ParserError id) $ PA.parseOne Ae.value'
     case Ae.fromJSON v of
       Ae.Error e   -> lift . E.throwError $ I.ValueError e
       Ae.Success r -> return r
-{-# INLINABLE decode #-}
+{-# INLINABLE decodeOne #-}
 
--- | Like 'Pipes.Aeson.decodeD', except it will decode any 'Ae.ToJSON' instance.
-decodeD
+-- | Like 'Pipes.Aeson.decode', except it will decode any 'Ae.ToJSON' instance.
+decode
   :: (Monad m, Ae.FromJSON b)
   => ()
   -> Proxy Pp.Draw (Maybe B.ByteString) () b
      (E.ErrorT I.DecodingError (StateT [B.ByteString] m)) ()
-decodeD = \() -> loop where
+decode = \() -> loop where
     loop = do
         eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
-        unless eof $ decode >>= respond >> loop
-{-# INLINABLE decodeD #-}
+        unless eof $ decodeOne >>= respond >> loop
+{-# INLINABLE decode #-}
 
 --------------------------------------------------------------------------------
+
+-- | Like 'Pipes.Aeson.parseValueOne', except it will parse into any 'Ae.Value'.
+parseValueOne
+  :: Monad m
+  => Client Pp.Draw (Maybe B.ByteString)
+     (E.ErrorT PA.ParsingError (StateT [B.ByteString] m)) Ae.Value
+parseValueOne = PA.parseOne Ae.value'
+{-# INLINABLE parseValueOne #-}
 
 -- | Like 'Pipes.Aeson.parseValue', except it will parse into any 'Ae.Value'.
 parseValue
   :: Monad m
-  => Client Pp.Draw (Maybe B.ByteString)
-     (E.ErrorT PA.ParsingError (StateT [B.ByteString] m)) Ae.Value
-parseValue = PA.parseOne Ae.value'
-{-# INLINABLE parseValue #-}
-
--- | Like 'Pipes.Aeson.parseValueD', except it will parse into any 'Ae.Value'.
-parseValueD
-  :: Monad m
   => ()
   -> Proxy Pp.Draw (Maybe B.ByteString) () Ae.Value
      (E.ErrorT PA.ParsingError (StateT [B.ByteString] m)) ()
-parseValueD = \() -> loop where
+parseValue = \() -> loop where
     loop = do
         eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
-        unless eof $ parseValue >>= respond >> loop
-{-# INLINABLE parseValueD #-}
+        unless eof $ parseValueOne >>= respond >> loop
+{-# INLINABLE parseValue #-}
 

@@ -14,17 +14,17 @@ module Pipes.Aeson
   , toTopLevelValue
     -- * Encoding
     -- $encoding
+  , encodeOne
   , encode
-  , encodeD
     -- * Decoding
     -- $decoding
+  , decodeOne
   , decode
-  , decodeD
     -- ** Lower level parsing
+  , parseValueOne
   , parseValue
-  , parseValueD
+  , fromValueOne
   , fromValue
-  , fromValueD
     -- * Types
   , I.DecodingError(..)
   ) where
@@ -93,8 +93,8 @@ toTopLevelValue = \a ->
 --
 -- There are two different JSON encoding facilities exported by this module, and
 -- choosing between them is easy: If you need to interleave JSON encoding
--- with other stream effects you must use 'encode', otherwise you may use the
--- simpler 'encodeD'.
+-- with other stream effects you must use 'encodeOne', otherwise you may use the
+-- simpler 'encode'.
 --
 -- Both encoding proxies enforce the JSON RFC-4627 requirement that top-level
 -- values are either 'Ae.Array's or 'Ae.Object's, as witnessed by the
@@ -104,15 +104,15 @@ toTopLevelValue = \a ->
 
 -- | Encodes the given 'TopLevelValue' as JSON and sends it downstream, possibly
 -- in more than one 'BS.ByteString' chunk.
-encode :: Monad m => TopLevelValue -> Producer B.ByteString m ()
-encode = U.encode
-{-# INLINABLE encode #-}
+encodeOne :: Monad m => TopLevelValue -> Producer B.ByteString m ()
+encodeOne = U.encodeOne
+{-# INLINABLE encodeOne #-}
 
 -- | Encodes 'TopLevelValue's flowing downstream as JSON, each in possibly more
 -- than one 'BS.ByteString' chunk, and sends each chunk downstream.
-encodeD :: Monad m => () -> Pipe TopLevelValue B.ByteString m r
-encodeD = U.encodeD
-{-# INLINABLE encodeD #-}
+encode :: Monad m => () -> Pipe TopLevelValue B.ByteString m r
+encode = U.encode
+{-# INLINABLE encode #-}
 
 --------------------------------------------------------------------------------
 -- $decoding
@@ -130,15 +130,15 @@ encodeD = U.encodeD
 -- There are two different JSON decoding facilities exported by this module,
 -- both perform those steps at once. Choosing between them is easy: If you
 -- need to interleave JSON decoding with other stream effects you must use
--- 'decode', otherwise you may use the simpler 'decodeD'.
+-- 'decodeOne', otherwise you may use the simpler 'decode'.
 --
 -- These proxies use the 'E.ErrorT' monad transformer to report decoding
 -- errors, you might use any of the facilities exported by
 -- "Control.Monad.Trans.Either" to recover from them.
 --
 -- If you prefer to perform each of the decoding steps separately, you
--- could use instead the 'parseValue', 'parseValueD', 'fromValue' or
--- 'fromValueD' proxies.
+-- could use instead the 'parseValueOne', 'parseValue', 'fromValueOne' or
+-- 'fromValue' proxies.
 
 
 -- | Decodes one JSON value flowing downstream.
@@ -152,7 +152,7 @@ encodeD = U.encodeD
 -- whitespace, otherwise you may get unexpected parsing errors.
 --
 -- Here is an example parsing loop that allows interleaving stream effects
--- together with 'decode':
+-- together with 'decodeOne':
 --
 -- @
 --   loop = do
@@ -161,22 +161,22 @@ encodeD = U.encodeD
 --       'unless' eof $ do
 --           -- 1. Possibly perform some stream effects here.
 --           -- 2. Decode one JSON element from the stream.
---           exampleElement <- 'decode'
+--           exampleElement <- 'decodeOne'
 --           -- 3. Do something with exampleElement and possibly perform
 --           --    some more stream effects.
 --           -- 4. Start all over again.
 --           loop
 -- @
-decode
+decodeOne
   :: (Monad m, Ae.FromJSON r)
   => Client Pp.Draw (Maybe B.ByteString)
      (E.ErrorT I.DecodingError (StateT [B.ByteString] m)) r
-decode = do
+decodeOne = do
     v <- hoist (I.bimapErrorT' I.ParserError id) $ PA.parseOne Ae.json'
     case Ae.fromJSON v of
       Ae.Error e   -> lift . E.throwError $ I.ValueError e
       Ae.Success r -> return r
-{-# INLINABLE decode #-}
+{-# INLINABLE decodeOne #-}
 
 
 -- | Decodes consecutive JSON values flowing downstream until end of input.
@@ -188,16 +188,16 @@ decode = do
 --
 -- * Empty input chunks flowing downstream and whitespace in between JSON
 -- values will be discarded.
-decodeD
+decode
   :: (Monad m, Ae.FromJSON b)
   => ()
   -> Proxy Pp.Draw (Maybe B.ByteString) () b
      (E.ErrorT I.DecodingError (StateT [B.ByteString] m)) ()
-decodeD = \() -> loop where
+decode = \() -> loop where
     loop = do
         eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
-        unless eof $ decode >>= respond >> loop
-{-# INLINABLE decodeD #-}
+        unless eof $ decodeOne >>= respond >> loop
+{-# INLINABLE decode #-}
 
 --------------------------------------------------------------------------------
 
@@ -211,14 +211,14 @@ decodeD = \() -> loop where
 -- * /Do not/ use this proxy if your stream has leading empty chunks or
 -- whitespace, otherwise you may get unexpected parsing errors.
 --
--- See the documentation of 'decode' for an example of how to interleave
+-- See the documentation of 'decodeOne' for an example of how to interleave
 -- other stream effects together with this proxy.
-parseValue
+parseValueOne
   :: Monad m
   => Client Pp.Draw (Maybe B.ByteString)
      (E.ErrorT PA.ParsingError (StateT [B.ByteString] m)) TopLevelValue
-parseValue = return . fromJust . toTopLevelValue =<< PA.parseOne Ae.json'
-{-# INLINABLE parseValue #-}
+parseValueOne = return . fromJust . toTopLevelValue =<< PA.parseOne Ae.json'
+{-# INLINABLE parseValueOne #-}
 
 
 -- | Parses consecutive JSON values flowing downstream as 'TopLevelValue's,
@@ -231,16 +231,16 @@ parseValue = return . fromJust . toTopLevelValue =<< PA.parseOne Ae.json'
 --
 -- * Empty input chunks flowing downstream and whitespace in between JSON
 -- values will be discarded.
-parseValueD
+parseValue
   :: Monad m
   => ()
   -> Proxy Pp.Draw (Maybe B.ByteString) () TopLevelValue
      (E.ErrorT PA.ParsingError (StateT [B.ByteString] m)) ()
-parseValueD = \() -> loop where
+parseValue = \() -> loop where
     loop = do
         eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
-        unless eof $ parseValue >>= respond >> loop
-{-# INLINABLE parseValueD #-}
+        unless eof $ parseValueOne >>= respond >> loop
+{-# INLINABLE parseValue #-}
 
 --------------------------------------------------------------------------------
 
@@ -249,16 +249,16 @@ parseValueD = \() -> loop where
 -- * In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'E.ErrorT' monad transformer.
 --
--- See the documentation of 'decode' for an example of how to interleave
+-- See the documentation of 'decodeOne' for an example of how to interleave
 -- other stream effects together with this proxy.
-fromValue
+fromValueOne
   :: (Monad m, Ae.FromJSON r) => x -> Client x Ae.Value (E.ErrorT String m) r
-fromValue = \x -> do
+fromValueOne = \x -> do
     v <- request x
     case Ae.fromJSON v of
       Ae.Error e   -> lift (E.throwError e)
       Ae.Success r -> return r
-{-# INLINABLE fromValue #-}
+{-# INLINABLE fromValueOne #-}
 
 
 -- | Converts any 'Ae.Value's flowing downstream to 'Ae.FromJSON' instances and
@@ -266,8 +266,8 @@ fromValue = \x -> do
 --
 -- * In case of parsing errors, a 'String' exception holding the value provided
 -- by Aeson's 'Ae.Error' is thrown in the 'E.ErrorT' monad transformer.
-fromValueD
+fromValue
   :: (Monad m, Ae.FromJSON b) => x -> Proxy x Ae.Value x b (E.ErrorT String m) r
-fromValueD = fromValue \>\ pull
-{-# INLINABLE fromValueD #-}
+fromValue = fromValueOne \>\ pull
+{-# INLINABLE fromValue #-}
 
