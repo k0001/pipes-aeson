@@ -36,7 +36,7 @@ import qualified Pipes.Parse                      as Pp
 import qualified Pipes.Aeson.Internal             as I
 import qualified Pipes.Aeson.Unsafe               as U
 import qualified Pipes.Attoparsec                 as PA
-import           Control.Monad.Trans.Either       (EitherT, left)
+import qualified Control.Monad.Trans.Error        as E
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Data.Aeson                       as Ae
 import qualified Data.ByteString.Char8            as B
@@ -132,7 +132,7 @@ encodeD = U.encodeD
 -- need to interleave JSON decoding with other stream effects you must use
 -- 'decode', otherwise you may use the simpler 'decodeD'.
 --
--- These proxies use the 'EitherT' monad transformer to report decoding
+-- These proxies use the 'E.ErrorT' monad transformer to report decoding
 -- errors, you might use any of the facilities exported by
 -- "Control.Monad.Trans.Either" to recover from them.
 --
@@ -144,7 +144,7 @@ encodeD = U.encodeD
 -- | Decodes one JSON value flowing downstream.
 --
 -- * In case of decoding errors, a 'I.DecodingError' exception is thrown in
--- the 'EitherT' monad transformer.
+-- the 'E.ErrorT' monad transformer.
 --
 -- * Requests more input from upstream using 'Pp.draw' when needed.
 --
@@ -170,11 +170,11 @@ encodeD = U.encodeD
 decode
   :: (Monad m, Ae.FromJSON r)
   => Client Pp.Draw (Maybe B.ByteString)
-     (EitherT I.DecodingError (StateT [B.ByteString] m)) r
+     (E.ErrorT I.DecodingError (StateT [B.ByteString] m)) r
 decode = do
-    v <- hoist (I.bimapEitherT' I.ParserError id) $ PA.parse Ae.json'
+    v <- hoist (I.bimapErrorT' I.ParserError id) $ PA.parseOne Ae.json'
     case Ae.fromJSON v of
-      Ae.Error e   -> lift . left $ I.ValueError e
+      Ae.Error e   -> lift . E.throwError $ I.ValueError e
       Ae.Success r -> return r
 {-# INLINABLE decode #-}
 
@@ -182,7 +182,7 @@ decode = do
 -- | Decodes consecutive JSON values flowing downstream until end of input.
 --
 -- * In case of decoding errors, a 'I.DecodingError' exception is thrown in
--- the 'EitherT' monad transformer.
+-- the 'E.ErrorT' monad transformer.
 --
 -- * Requests more input from upstream using 'Pp.draw' when needed.
 --
@@ -192,7 +192,7 @@ decodeD
   :: (Monad m, Ae.FromJSON b)
   => ()
   -> Proxy Pp.Draw (Maybe B.ByteString) () b
-     (EitherT I.DecodingError (StateT [B.ByteString] m)) ()
+     (E.ErrorT I.DecodingError (StateT [B.ByteString] m)) ()
 decodeD = \() -> loop where
     loop = do
         eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
@@ -204,7 +204,7 @@ decodeD = \() -> loop where
 -- | Parses a JSON value flowing downstream into a 'TopLevelValue'.
 --
 -- * In case of parsing errors, a 'PA.ParsingError' exception is thrown in
--- the 'EitherT' monda transformer.
+-- the 'E.ErrorT' monda transformer.
 --
 -- * Requests more input from upstream using 'Pp.draw' when needed.
 --
@@ -216,8 +216,8 @@ decodeD = \() -> loop where
 parseValue
   :: Monad m
   => Client Pp.Draw (Maybe B.ByteString)
-     (EitherT PA.ParsingError (StateT [B.ByteString] m)) TopLevelValue
-parseValue = return . fromJust . toTopLevelValue =<< PA.parse Ae.json'
+     (E.ErrorT PA.ParsingError (StateT [B.ByteString] m)) TopLevelValue
+parseValue = return . fromJust . toTopLevelValue =<< PA.parseOne Ae.json'
 {-# INLINABLE parseValue #-}
 
 
@@ -225,7 +225,7 @@ parseValue = return . fromJust . toTopLevelValue =<< PA.parse Ae.json'
 -- until end of input.
 --
 -- * In case of parsing errors, a 'I.DecodingError' exception is thrown in
--- the 'EitherT' monad transformer.
+-- the 'E.ErrorT' monad transformer.
 --
 -- * Requests more input from upstream using 'Pp.draw' when needed.
 --
@@ -235,7 +235,7 @@ parseValueD
   :: Monad m
   => ()
   -> Proxy Pp.Draw (Maybe B.ByteString) () TopLevelValue
-     (EitherT PA.ParsingError (StateT [B.ByteString] m)) ()
+     (E.ErrorT PA.ParsingError (StateT [B.ByteString] m)) ()
 parseValueD = \() -> loop where
     loop = do
         eof <- hoist lift $ I.skipSpace >> PA.isEndOfParserInput
@@ -247,16 +247,16 @@ parseValueD = \() -> loop where
 -- | Converts any 'Ae.Value' flowing downstream to a 'Ae.FromJSON' instance.
 --
 -- * In case of parsing errors, a 'String' exception holding the value provided
--- by Aeson's 'Ae.Error' is thrown in the 'EitherT' monad transformer.
+-- by Aeson's 'Ae.Error' is thrown in the 'E.ErrorT' monad transformer.
 --
 -- See the documentation of 'decode' for an example of how to interleave
 -- other stream effects together with this proxy.
 fromValue
-  :: (Monad m, Ae.FromJSON r) => x -> Client x Ae.Value (EitherT String m) r
+  :: (Monad m, Ae.FromJSON r) => x -> Client x Ae.Value (E.ErrorT String m) r
 fromValue = \x -> do
     v <- request x
     case Ae.fromJSON v of
-      Ae.Error e   -> lift (left e)
+      Ae.Error e   -> lift (E.throwError e)
       Ae.Success r -> return r
 {-# INLINABLE fromValue #-}
 
@@ -265,9 +265,9 @@ fromValue = \x -> do
 -- forwards them downstream.
 --
 -- * In case of parsing errors, a 'String' exception holding the value provided
--- by Aeson's 'Ae.Error' is thrown in the 'EitherT' monad transformer.
+-- by Aeson's 'Ae.Error' is thrown in the 'E.ErrorT' monad transformer.
 fromValueD
-  :: (Monad m, Ae.FromJSON b) => x -> Proxy x Ae.Value x b (EitherT String m) r
+  :: (Monad m, Ae.FromJSON b) => x -> Proxy x Ae.Value x b (E.ErrorT String m) r
 fromValueD = fromValue \>\ pull
 {-# INLINABLE fromValueD #-}
 

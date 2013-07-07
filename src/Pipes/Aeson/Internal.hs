@@ -7,14 +7,14 @@
 -- Use the stable API exported by the "Pipes.Aeson" module instead.
 module Pipes.Aeson.Internal
   ( DecodingError(..)
-  , bimapEitherT'
+  , bimapErrorT'
   , skipSpace
   , fromLazy
   ) where
 
 import           Control.Exception                (Exception)
 import           Control.Monad                    (liftM)
-import qualified Control.Monad.Trans.Either       as E
+import qualified Control.Monad.Trans.Error        as E
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Data.ByteString.Char8            as B
 import qualified Data.ByteString.Lazy.Internal    as BLI
@@ -38,17 +38,18 @@ data DecodingError
   deriving (Show, Eq, Data, Typeable)
 
 instance Exception DecodingError
+instance E.Error   DecodingError
 
 --------------------------------------------------------------------------------
 
--- | Like 'E.bimapEitherT', except without the 'Functor' constraint.
-bimapEitherT'
-  :: Monad m => (e -> e') -> (a -> a') -> E.EitherT e m a -> E.EitherT e' m a'
-bimapEitherT' f g = E.EitherT . liftM h . E.runEitherT
+-- | Like 'E.bimapE.ErrorT', except without the 'Functor' constraint.
+bimapErrorT'
+  :: Monad m => (e -> e') -> (a -> a') -> E.ErrorT e m a -> E.ErrorT e' m a'
+bimapErrorT' f g = E.ErrorT . liftM h . E.runErrorT
   where
     h (Left e)  = Left (f e)
     h (Right a) = Right (g a)
-{-# INLINABLE bimapEitherT' #-}
+{-# INLINABLE bimapErrorT' #-}
 
 --------------------------------------------------------------------------------
 -- XXX we define the following proxies here until 'pipes-bytestring' is released
