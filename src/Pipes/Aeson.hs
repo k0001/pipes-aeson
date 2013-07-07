@@ -32,10 +32,11 @@ module Pipes.Aeson
 
 import           Control.Monad                    (unless)
 import           Pipes
-import qualified Pipes.Parse                      as Pp
 import qualified Pipes.Aeson.Internal             as I
 import qualified Pipes.Aeson.Unsafe               as U
 import qualified Pipes.Attoparsec                 as PA
+import           Pipes.Lift                       (runErrorP)
+import qualified Pipes.Parse                      as Pp
 import qualified Control.Monad.Trans.Error        as E
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Data.Aeson                       as Ae
@@ -172,10 +173,13 @@ decodeOne
   => Client Pp.Draw (Maybe B.ByteString)
      (E.ErrorT I.DecodingError (StateT [B.ByteString] m)) r
 decodeOne = do
-    v <- hoist (I.bimapErrorT' I.ParserError id) $ PA.parseOne Ae.json'
-    case Ae.fromJSON v of
-      Ae.Error e   -> lift . E.throwError $ I.ValueError e
-      Ae.Success r -> return r
+    ev <- hoist lift (runErrorP (PA.parseOne Ae.json'))
+    case ev of
+      Left e -> lift (E.throwError (I.ParserError e))
+      Right v -> do
+        case Ae.fromJSON v of
+          Ae.Error e   -> lift (E.throwError (I.ValueError e))
+          Ae.Success r -> return r
 {-# INLINABLE decodeOne #-}
 
 

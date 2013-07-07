@@ -7,13 +7,11 @@
 -- Use the stable API exported by the "Pipes.Aeson" module instead.
 module Pipes.Aeson.Internal
   ( DecodingError(..)
-  , bimapErrorT'
   , skipSpace
   , fromLazy
   ) where
 
 import           Control.Exception                (Exception)
-import           Control.Monad                    (liftM)
 import qualified Control.Monad.Trans.Error        as E
 import           Control.Monad.Trans.State.Strict (StateT)
 import qualified Data.ByteString.Char8            as B
@@ -42,16 +40,6 @@ instance E.Error   DecodingError
 
 --------------------------------------------------------------------------------
 
--- | Like 'E.bimapE.ErrorT', except without the 'Functor' constraint.
-bimapErrorT'
-  :: Monad m => (e -> e') -> (a -> a') -> E.ErrorT e m a -> E.ErrorT e' m a'
-bimapErrorT' f g = E.ErrorT . liftM h . E.runErrorT
-  where
-    h (Left e)  = Left (f e)
-    h (Right a) = Right (g a)
-{-# INLINABLE bimapErrorT' #-}
-
---------------------------------------------------------------------------------
 -- XXX we define the following proxies here until 'pipes-bytestring' is released
 
 -- | Consumes and discards leading 'I.ParserInput' characters from upstream as
