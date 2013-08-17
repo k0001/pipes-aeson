@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | This module provides internal utilities and it is likely
 -- to be modified in backwards-incompatible ways in the future.
@@ -7,21 +9,22 @@
 -- Use the stable API exported by the "Pipes.Aeson" module instead.
 module Pipes.Aeson.Internal
   ( DecodingError(..)
+  , consecutively
   , skipSpace
   , fromLazy
   ) where
 
 import           Control.Exception                (Exception)
 import qualified Control.Monad.Trans.Error        as E
-import           Control.Monad.Trans.State.Strict (StateT)
+import qualified Control.Monad.Trans.State.Strict as S
 import qualified Data.ByteString.Char8            as B
 import qualified Data.ByteString.Lazy.Internal    as BLI
 import qualified Data.Char                        as Char
 import           Data.Data                        (Data, Typeable)
-import           Data.Function                    (fix)
 import           Pipes
 import qualified Pipes.Attoparsec                 as PA
-import qualified Pipes.Parse                      as Pp
+import qualified Pipes.Parse                      as P
+import qualified Pipes.Lift                       as P
 
 --------------------------------------------------------------------------------
 
@@ -36,7 +39,37 @@ data DecodingError
   deriving (Show, Eq, Data, Typeable)
 
 instance Exception DecodingError
-instance E.Error   DecodingError
+instance E.Error DecodingError
+instance Monad m => E.Error (DecodingError, Producer a m r)
+
+--------------------------------------------------------------------------------
+
+-- | Consecutively parse 'b' elements from the given 'Producer' using the given
+-- parser (such as 'Pipes.Aeson.decode' or 'Pipes.Aeson.parseValue'), skipping
+-- any leading whitespace each time.
+--
+-- If parsing fails, throws in 'E.ErrorT' an error description and a 'Producer'
+-- with any leftovers. Otherwise, if end-of-file is reached, returns `()`.
+consecutively
+  :: (Monad m, E.Error (e, Producer B.ByteString m r))
+  => S.StateT (Producer B.ByteString m r) m (Either e b)
+  -> Producer B.ByteString m r
+  -> Producer b (E.ErrorT (e, Producer B.ByteString m r) m) ()
+consecutively parser src = do
+    r <- hoist lift (P.runStateP src prod)
+    case r of
+      (Just e,  p) -> lift (E.throwError (e, p))
+      (Nothing, _) -> lift (return ())
+  where
+    prod = do
+        eof <- lift (skipSpace >> PA.isEndOfParserInput)
+        if eof
+          then return Nothing
+          else do
+            eb <- lift parser
+            case eb of
+              Left e  -> return (Just e)
+              Right b -> yield b >> prod
 
 --------------------------------------------------------------------------------
 
@@ -44,20 +77,20 @@ instance E.Error   DecodingError
 
 -- | Consumes and discards leading 'I.ParserInput' characters from upstream as
 -- long as the given predicate holds 'True'.
-skipSpace
-  :: Monad m => Client Pp.Draw (Maybe B.ByteString) (StateT [B.ByteString] m) ()
-skipSpace = fix $ \loop -> do
-    ma <- Pp.draw
+skipSpace :: Monad m => S.StateT (Producer B.ByteString m r) m ()
+skipSpace = do
+    ma <- P.draw
     case ma of
       Nothing -> return ()
       Just a  -> do
         let a' = B.dropWhile Char.isSpace a
         if B.null a'
-           then loop
-           else Pp.unDraw a'
+           then skipSpace
+           else P.unDraw a'
 {-# INLINABLE skipSpace #-}
 
 -- Sends each of the 'BLI.ByteString''s strict chunks downstream.
-fromLazy :: Monad m => BLI.ByteString -> Server y' B.ByteString m ()
-fromLazy = BLI.foldrChunks (\e a -> respond e >> a) (return ())
+fromLazy :: Monad m => BLI.ByteString -> Producer' B.ByteString m ()
+fromLazy = BLI.foldrChunks (\e a -> yield e >> a) (return ())
 {-# INLINABLE fromLazy #-}
+
