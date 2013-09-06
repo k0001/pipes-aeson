@@ -10,4 +10,6 @@ dist
 *.o
 TAGS
 vendor
+\#*
+.\#*
 .shelly
