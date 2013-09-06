@@ -8,10 +8,8 @@
 
 module Pipes.Aeson.Unsafe
   ( -- * Encoding
-    -- $encoding
     encode
     -- * Decoding
-    -- $decoding
   , decode
   ) where
 
@@ -27,7 +25,7 @@ import qualified Data.ByteString                  as B
 
 -- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance.
 encode :: (Monad m, Ae.ToJSON a) => a -> Producer B.ByteString m ()
-encode = \x -> I.fromLazy (Ae.encode x)
+encode = I.fromLazy . Ae.encode
 {-# INLINABLE encode #-}
 
 --------------------------------------------------------------------------------

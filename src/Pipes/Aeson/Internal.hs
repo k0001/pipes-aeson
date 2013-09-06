@@ -54,12 +54,12 @@ consecutively
   :: (Monad m, E.Error (e, Producer B.ByteString m r))
   => S.StateT (Producer B.ByteString m r) m (Either e b)
   -> Producer B.ByteString m r
-  -> Producer b (E.ErrorT (e, Producer B.ByteString m r) m) ()
+  -> Producer b m (Either (e, Producer B.ByteString m r) ())
 consecutively parser src = do
-    r <- hoist lift (P.runStateP src prod)
-    case r of
-      (Just e,  p) -> lift (E.throwError (e, p))
-      (Nothing, _) -> lift (return ())
+    r <- P.runStateP src prod
+    return $ case r of
+      (Just e,  p) -> Left (e, p)
+      (Nothing, _) -> Right ()
   where
     prod = do
         eof <- lift (skipSpace >> PA.isEndOfParserInput)
