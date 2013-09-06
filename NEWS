@@ -2,7 +2,8 @@
 
 * Version compatible with `pipes-4.0.0` and `pipes-parse-2.0.0`.
 
-* API radically changed. Introduced `consecutively`.
+* API radically changed. Introduced `consecutively`, removed
+  `parseValue` and `fromValue`.
 
 
 # 0.1.0.0
