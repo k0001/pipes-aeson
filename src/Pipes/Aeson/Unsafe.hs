@@ -13,8 +13,6 @@ module Pipes.Aeson.Unsafe
     -- * Decoding
     -- $decoding
   , decode
-    -- ** Lower level parsing
-  , parseValue
   ) where
 
 import           Pipes
@@ -29,8 +27,8 @@ import qualified Data.ByteString                  as B
 
 -- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance.
 encode :: (Monad m, Ae.ToJSON a) => a -> Producer B.ByteString m ()
-encode = I.fromLazy . Ae.encode
-{-# INLINE encode #-}
+encode = \x -> I.fromLazy (Ae.encode x)
+{-# INLINABLE encode #-}
 
 --------------------------------------------------------------------------------
 
@@ -40,7 +38,7 @@ decode
   => S.StateT (Producer B.ByteString m r) m (Either I.DecodingError (Int, b))
 decode = do
     ev <- PA.parse Ae.value'
-    return $
+    return $ do
       case ev of
         Left  e        -> Left (I.ParserError e)
         Right (len, v) -> do
@@ -48,13 +46,4 @@ decode = do
             Ae.Error e   -> Left (I.ValueError e)
             Ae.Success b -> Right (len, b)
 {-# INLINABLE decode #-}
-
---------------------------------------------------------------------------------
-
--- | Like 'Pipes.Aeson.parseValue', except it will parse into any 'Ae.Value'.
-parseValue
-  :: Monad m
-  => S.StateT (Producer B.ByteString m r) m (Either PA.ParsingError (Int, Ae.Value))
-parseValue = PA.parse Ae.value'
-{-# INLINE parseValue #-}
 

@@ -17,9 +17,6 @@ module Pipes.Aeson
     -- * Decoding
     -- $decoding
   , decode
-    -- ** Lower level parsing
-  , parseValue
-  , fromValue
     -- ** Consecutive elements
   , I.consecutively
     -- * Types
@@ -31,11 +28,9 @@ import           Pipes
 import qualified Pipes.Aeson.Internal             as I
 import qualified Pipes.Aeson.Unsafe               as U
 import qualified Pipes.Attoparsec                 as PA
-import qualified Control.Monad.Trans.Error        as E
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Data.Aeson                       as Ae
 import qualified Data.ByteString.Char8            as B
-import           Data.Maybe                       (fromJust)
 
 --------------------------------------------------------------------------------
 -- $top-level-value
@@ -124,11 +119,6 @@ encode = U.encode
 -- These proxies use the 'E.ErrorT' monad transformer to report decoding
 -- errors, you might use any of the facilities exported by
 -- "Control.Monad.Trans.Either" to recover from them.
---
--- If you prefer to perform each of the decoding steps separately, you
--- could use instead the 'parseValue', 'parseValue', 'fromValue' or
--- 'fromValue' proxies.
-
 
 -- | Decodes a top-level JSON value flowing downstream through the underlying
 -- state.
@@ -165,50 +155,3 @@ decode = do
             Ae.Success b -> Right (len, b)
 {-# INLINABLE decode #-}
 
---------------------------------------------------------------------------------
-
--- | Parses a JSON value flowing downstream into a 'TopLevelValue'.
---
--- * In case of parsing errors, a 'PA.ParsingError' exception is thrown in
--- the 'E.ErrorT' monda transformer.
---
--- * Requests more input from upstream using 'P.draw' when needed.
---
--- * /Do not/ use this proxy if your stream has leading empty chunks or
--- whitespace, otherwise you may get unexpected parsing errors.
---
--- This function parses a single top-level value. If instead, you want to
--- consecutively parse top-level JSON values flowing downstream, possibly
--- skipping whitespace in between them, use:
---
--- @
--- 'consecutively' 'parseValue'
---   :: 'Monad' m
---   => 'Producer' 'B.ByteString' m r
---   -> 'Producer' ('Int', 'TopLevelValue') ('E.ErrorT' ('PA.ParsingError', 'Producer' 'B.ByteString' m r) m) ()
--- @
-parseValue
-  :: Monad m
-  => S.StateT (Producer B.ByteString m r) m (Either PA.ParsingError (Int, TopLevelValue))
-parseValue = do
-    eb <- PA.parse Ae.json'
-    return $ case eb of
-      Left e        -> Left e
-      Right (len,b) -> Right (len, fromJust (toTopLevelValue b))
-{-# INLINABLE parseValue #-}
-
---------------------------------------------------------------------------------
-
--- | Converts any 'Ae.Value' flowing downstream to a 'Ae.FromJSON' instance.
---
--- * In case of parsing errors, a 'String' exception holding the value provided
--- by Aeson's 'Ae.Error' is thrown in the 'E.ErrorT' monad transformer.
---
--- See the documentation of 'decode' for an example of how to interleave
--- other stream effects together with this proxy.
-fromValue :: (Monad m, Ae.FromJSON r) => Pipe Ae.Value b (E.ErrorT String m) r
-fromValue = for cat $ \a -> do
-    case Ae.fromJSON a of
-      Ae.Error e   -> lift (E.throwError e)
-      Ae.Success r -> return r
-{-# INLINABLE fromValue #-}
