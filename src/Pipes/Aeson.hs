@@ -32,7 +32,8 @@ import qualified Data.ByteString.Char8            as B
 --
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
 -- entities, which is why this function restricts its input to them. If you
--- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'.
+-- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'
+-- from the "Pipes.Aeson.Unsafe" module.
 encode :: Monad m => Either Ae.Object Ae.Array -> Producer B.ByteString m ()
 encode = either U.encode U.encode
 {-# INLINABLE encode #-}
@@ -54,13 +55,12 @@ encode = either U.encode U.encode
 -- | Decodes an 'Ae.Object' or 'Ae.Array' JSON value from the underlying state.
 --
 -- /Do not/ use this function if the underlying 'Producer' has leading empty
--- chunks or whitespace, otherwise you may get unexpected parsing errors. That
--- is, check that 'Pipes.ByteString.isEndOfBytes' returns 'True' before using
--- this function.
+-- chunks or whitespace, otherwise you may get unexpected parsing errors.
 --
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
 -- entities, which is why this 'Producer' restricts its output to them. If you
--- prefer to ignore the standard and decode any 'Ae.Value', then use 'U.decode'.
+-- prefer to ignore the standard and decode any 'Ae.Value', then use 'U.decode'
+-- from the "Pipes.Aeson.Unsafe" module.
 decode
   :: (Monad m, Ae.FromJSON b)
   => S.StateT (Producer B.ByteString m r) m (Either I.DecodingError (Int, b))
@@ -71,23 +71,29 @@ decode = do
         Left  e        -> Left (I.ParserError e)
         Right (len, v) -> do
           case Ae.fromJSON v of
-            Ae.Error e   -> Left (I.ValueError e)
+            Ae.Error   e -> Left  (I.ValueError e)
             Ae.Success b -> Right (len, b)
 {-# INLINABLE decode #-}
 
 -- | Continuously 'decode' the JSON output from the given 'Producer', sending
 -- downstream pairs of each successfully decoded entity together with the number
--- of bytes consumed in order to produce it.
+-- of bytes consumed in order to produce it. Whitespace in between JSON content
+-- is ignored.
 --
--- This 'Producer' runs until it either runs out of input, in which case it
--- returns @'Right' ()@, or until a decoding failure occurs, in which case
--- it returns a 'Left' providing a 'I.DecodingError' and a 'Producer' with any
--- leftovers.
+-- This 'Producer' runs until it either runs out of input or until a decoding
+-- failure occurs, in which case it returns 'Left' with a 'I.DecodingError' and
+-- a 'Producer' with any leftovers. You can use 'P.errorP' to turn the 'Either'
+-- return value into an 'Control.Monad.Trans.Error.ErrorT' monad transformer.
+--
+-- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
+-- entities, which is why this 'Producer' restricts its output to them. If you
+-- prefer to ignore the standard and decode any 'Ae.Value', then use
+-- 'U.decodeMany' from the "Pipes.Aeson.Unsafe" module.
 decodeMany
   :: (Monad m, Ae.FromJSON b)
   => Producer B.ByteString m r  -- ^Producer from which to draw JSON.
   -> Producer (Int, b) m
-              (Either (I.DecodingError, Producer B.ByteString m r) ())
+              (Either (I.DecodingError, Producer B.ByteString m r) r)
 decodeMany = I.consecutively decode
 {-# INLINABLE decodeMany #-}
 

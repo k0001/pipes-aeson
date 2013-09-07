@@ -11,6 +11,7 @@ module Pipes.Aeson.Unsafe
     encode
     -- * Decoding
   , decode
+  , decodeMany
   ) where
 
 import           Pipes
@@ -23,14 +24,16 @@ import qualified Data.ByteString                  as B
 
 --------------------------------------------------------------------------------
 
--- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance.
+-- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance,
+-- not just 'Ae.Array' or 'Ae.Object'.
 encode :: (Monad m, Ae.ToJSON a) => a -> Producer B.ByteString m ()
 encode = I.fromLazy . Ae.encode
 {-# INLINABLE encode #-}
 
 --------------------------------------------------------------------------------
 
--- | Like 'Pipes.Aeson.decode', except it will decode any 'Ae.ToJSON' instance.
+-- | Like 'Pipes.Aeson.decode', except it will decode any 'Ae.ToJSON' instance,
+-- not just 'Ae.Array' or 'Ae.Object'.
 decode
   :: (Monad m, Ae.FromJSON b)
   => S.StateT (Producer B.ByteString m r) m (Either I.DecodingError (Int, b))
@@ -44,4 +47,14 @@ decode = do
             Ae.Error e   -> Left (I.ValueError e)
             Ae.Success b -> Right (len, b)
 {-# INLINABLE decode #-}
+
+-- | Like 'Pipes.Aeson.decodeMany', except it will decode any 'Ae.ToJSON'
+-- instance, not just 'Ae.Array' or 'Ae.Object'.
+decodeMany
+  :: (Monad m, Ae.FromJSON b)
+  => Producer B.ByteString m r  -- ^Producer from which to draw JSON.
+  -> Producer (Int, b) m
+              (Either (I.DecodingError, Producer B.ByteString m r) r)
+decodeMany = I.consecutively decode
+{-# INLINABLE decodeMany #-}
 

@@ -17,13 +17,14 @@ module Pipes.Aeson.Internal
 import           Control.Exception                (Exception)
 import qualified Control.Monad.Trans.Error        as E
 import qualified Control.Monad.Trans.State.Strict as S
+import qualified Data.Aeson                       as Ae
 import qualified Data.ByteString.Char8            as B
 import qualified Data.ByteString.Lazy.Internal    as BLI
 import qualified Data.Char                        as Char
 import           Data.Data                        (Data, Typeable)
 import           Pipes
 import qualified Pipes.Attoparsec                 as PA
-import qualified Pipes.Parse                      as P
+import qualified Pipes.Parse                      as Pp
 import qualified Pipes.Lift                       as P
 
 --------------------------------------------------------------------------------
@@ -48,28 +49,36 @@ instance Monad m => E.Error (DecodingError, Producer a m r)
 -- parser (such as 'Pipes.Aeson.decode' or 'Pipes.Aeson.parseValue'), skipping
 -- any leading whitespace each time.
 --
--- If parsing fails, throws in 'E.ErrorT' an error description and a 'Producer'
--- with any leftovers. Otherwise, if end-of-file is reached, returns `()`.
+-- This 'Producer' runs until it either runs out of input or until a decoding
+-- failure occurs, in which case it returns 'Left' with a 'I.DecodingError' and
+-- a 'Producer' with any leftovers. You can use 'P.errorP' to turn the 'Either'
+-- return value into an 'Control.Monad.Trans.Error.ErrorT' monad transformer.
 consecutively
-  :: (Monad m, E.Error (e, Producer B.ByteString m r))
-  => S.StateT (Producer B.ByteString m r) m (Either e b)
-  -> Producer B.ByteString m r
-  -> Producer b m (Either (e, Producer B.ByteString m r) ())
-consecutively parser src = do
-    r <- P.runStateP src prod
-    return $ case r of
-      (Just e,  p) -> Left (e, p)
-      (Nothing, _) -> Right ()
+  :: (Monad m, Ae.FromJSON b)
+  => S.StateT (Producer B.ByteString m r) m (Either DecodingError (Int, b))
+  -> Producer B.ByteString m r  -- ^Producer from which to draw JSON.
+  -> Producer (Int, b) m
+              (Either (DecodingError, Producer B.ByteString m r) r)
+consecutively parser = \src -> do
+    (er, src') <- P.runStateP src prod
+    return $ case er of
+      Left  e  -> Left  (e, src')
+      Right r  -> Right r
   where
     prod = do
         eof <- lift (skipSpace >> PA.isEndOfParserInput)
         if eof
-          then return Nothing
+          then do
+            ra <- lift Pp.draw
+            case ra of
+              Left  r -> return (Right r)
+              Right _ -> error "Pipes.Aeson.parseMany: impossible!!"
           else do
             eb <- lift parser
             case eb of
-              Left e  -> return (Just e)
+              Left  e -> return (Left e)
               Right b -> yield b >> prod
+{-# INLINABLE consecutively #-}
 
 --------------------------------------------------------------------------------
 
@@ -79,18 +88,17 @@ consecutively parser src = do
 -- long as the given predicate holds 'True'.
 skipSpace :: Monad m => S.StateT (Producer B.ByteString m r) m ()
 skipSpace = do
-    ma <- P.draw
+    ma <- Pp.draw
     case ma of
-      Nothing -> return ()
-      Just a  -> do
+      Left  _ -> return ()
+      Right a -> do
         let a' = B.dropWhile Char.isSpace a
         if B.null a'
            then skipSpace
-           else P.unDraw a'
+           else Pp.unDraw a'
 {-# INLINABLE skipSpace #-}
 
 -- Sends each of the 'BLI.ByteString''s strict chunks downstream.
 fromLazy :: Monad m => BLI.ByteString -> Producer' B.ByteString m ()
 fromLazy = BLI.foldrChunks (\e a -> yield e >> a) (return ())
 {-# INLINABLE fromLazy #-}
-
