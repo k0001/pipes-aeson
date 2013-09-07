@@ -12,7 +12,7 @@ bug-reports:        https://github.com/k0001/pipes-aeson/issues
 category:           Pipes, Parser
 build-type:         Simple
 cabal-version:      >=1.8
-synopsis:           Encode and decode JSON streams using aeson and pipes.
+synopsis:           Encode and decode JSON streams using Aeson and Pipes.
 extra-source-files: README.md PEOPLE NEWS
 description:
   Utilities to encode and decode Pipes streams of JSON.
