@@ -54,6 +54,9 @@ encode = either U.encode U.encode
 
 -- | Decodes an 'Ae.Object' or 'Ae.Array' JSON value from the underlying state.
 --
+-- Returns either the decoded entitiy and the number of decoded bytes,
+-- or a 'I.DecodingError' in case of failures.
+--
 -- /Do not/ use this function if the underlying 'Producer' has leading empty
 -- chunks or whitespace, otherwise you may get unexpected parsing errors.
 --
