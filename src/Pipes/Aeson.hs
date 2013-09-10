@@ -85,8 +85,9 @@ decode = do
 --
 -- This 'Producer' runs until it either runs out of input or until a decoding
 -- failure occurs, in which case it returns 'Left' with a 'I.DecodingError' and
--- a 'Producer' with any leftovers. You can use 'P.errorP' to turn the 'Either'
--- return value into an 'Control.Monad.Trans.Error.ErrorT' monad transformer.
+-- a 'Producer' with any leftovers. You can use 'Pipes.Lift.errorP' to turn the
+-- 'Either' return value into an 'Control.Monad.Trans.Error.ErrorT' monad
+-- transformer.
 --
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
 -- entities, which is why this 'Producer' restricts its output to them. If you
