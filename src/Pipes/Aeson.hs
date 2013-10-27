@@ -34,6 +34,13 @@ import qualified Data.ByteString.Char8            as B
 -- entities, which is why this function restricts its input to them. If you
 -- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'
 -- from the "Pipes.Aeson.Unsafe" module.
+--
+-- /Hint:/ You can easily turn this 'Producer'' into a 'Pipe' that encodes
+-- 'Ae.Array' or 'Ae.Object' values as JSON as they flow downstream using:
+--
+-- @
+-- 'for' 'cat' 'encode' :: ('Monad' m) => 'Pipe' ('Either' 'Ae.Object' 'Ae.Array') 'B.ByteString' m r
+-- @
 encode :: Monad m => Either Ae.Object Ae.Array -> Producer' B.ByteString m ()
 encode = either U.encode U.encode
 {-# INLINABLE encode #-}
