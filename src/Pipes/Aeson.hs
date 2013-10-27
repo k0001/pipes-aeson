@@ -34,7 +34,7 @@ import qualified Data.ByteString.Char8            as B
 -- entities, which is why this function restricts its input to them. If you
 -- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'
 -- from the "Pipes.Aeson.Unsafe" module.
-encode :: Monad m => Either Ae.Object Ae.Array -> Producer B.ByteString m ()
+encode :: Monad m => Either Ae.Object Ae.Array -> Producer' B.ByteString m ()
 encode = either U.encode U.encode
 {-# INLINABLE encode #-}
 

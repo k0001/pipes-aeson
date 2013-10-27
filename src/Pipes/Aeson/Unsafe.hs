@@ -26,7 +26,7 @@ import qualified Data.ByteString                  as B
 
 -- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance,
 -- not just 'Ae.Array' or 'Ae.Object'.
-encode :: (Monad m, Ae.ToJSON a) => a -> Producer B.ByteString m ()
+encode :: (Monad m, Ae.ToJSON a) => a -> Producer' B.ByteString m ()
 encode = I.fromLazy . Ae.encode
 {-# INLINABLE encode #-}
 
