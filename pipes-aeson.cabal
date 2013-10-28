@@ -35,7 +35,7 @@ library
     , base             (>=4.5   && <5.0)
     , pipes            (>=4.0   && <4.1)
     , pipes-attoparsec (>=0.3   && <0.4)
-    , pipes-parse      (>=2.0   && <2.2)
+    , pipes-parse      (>=2.0   && <2.1)
     , bytestring       (>=0.9.2.1)
     , transformers     (>=0.2   && <0.4)
   ghc-options: -Wall -O2
