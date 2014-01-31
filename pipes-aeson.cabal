@@ -2,7 +2,7 @@ name:               pipes-aeson
 version:            0.2.0
 license:            BSD3
 license-file:       LICENSE
-copyright:          Copyright (c) Renzo Carbonara 2013
+copyright:          Copyright (c) Renzo Carbonara 2013-2014
 author:             Renzo Carbonara
 maintainer:         renzocarbonaraλgmail.com
 stability:          Experimental
