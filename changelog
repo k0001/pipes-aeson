@@ -1,4 +1,4 @@
-# HEAD
+# 0.2.1
 
 * Generalize `encode` from `Producer` to `Producer'`.
 
