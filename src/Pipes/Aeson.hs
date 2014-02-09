@@ -9,21 +9,30 @@
 module Pipes.Aeson
   ( -- * Encoding
     encode
+
     -- * Decoding
     -- $decoding
   , decode
-  , decodeMany
+  , decoded
+    -- ** Including lengths
+  , decodeL
+  , decodedL
+
     -- * Types
   , I.DecodingError(..)
   ) where
 
+import qualified Data.Aeson                       as Ae
+import qualified Data.ByteString.Char8            as B
 import           Pipes
 import qualified Pipes.Aeson.Internal             as I
 import qualified Pipes.Aeson.Unsafe               as U
 import qualified Pipes.Attoparsec                 as PA
-import qualified Control.Monad.Trans.State.Strict as S
-import qualified Data.Aeson                       as Ae
-import qualified Data.ByteString.Char8            as B
+import qualified Pipes.Parse                      as Pipes
+
+--------------------------------------------------------------------------------
+
+type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
 
 --------------------------------------------------------------------------------
 
@@ -42,8 +51,12 @@ import qualified Data.ByteString.Char8            as B
 -- 'for' 'cat' 'encode' :: ('Monad' m) => 'Pipe' ('Either' 'Ae.Object' 'Ae.Array') 'B.ByteString' m r
 -- @
 encode :: Monad m => Either Ae.Object Ae.Array -> Producer' B.ByteString m ()
-encode = either U.encode U.encode
+encode (Left  x) = U.encode x
+encode (Right x) = U.encode x
 {-# INLINABLE encode #-}
+{-# RULES "p >-> for cat encode" forall p .
+    p >-> for cat encode = for p (\a -> encode a)
+  #-}
 
 --------------------------------------------------------------------------------
 -- $decoding
@@ -72,39 +85,56 @@ encode = either U.encode U.encode
 -- prefer to ignore the standard and decode any 'Ae.Value', then use 'U.decode'
 -- from the "Pipes.Aeson.Unsafe" module.
 decode
-  :: (Monad m, Ae.FromJSON b)
-  => S.StateT (Producer B.ByteString m r) m (Either I.DecodingError (Int, b))
+  :: (Monad m, Ae.FromJSON a)
+  => Pipes.Parser B.ByteString m (Either I.DecodingError a)
 decode = do
-    ev <- PA.parse Ae.json'
-    return $ do
-      case ev of
-        Left  e        -> Left (I.ParserError e)
-        Right (len, v) -> do
-          case Ae.fromJSON v of
-            Ae.Error   e -> Left  (I.ValueError e)
-            Ae.Success b -> Right (len, b)
+    x <- decodeL
+    return (case x of
+       Left   e     -> Left  e
+       Right (_, a) -> Right a)
 {-# INLINABLE decode #-}
 
--- | Continuously 'decode' the JSON output from the given 'Producer', sending
--- downstream pairs of each successfully decoded entity together with the number
--- of bytes consumed in order to produce it. Whitespace in between JSON content
--- is ignored.
---
--- This 'Producer' runs until it either runs out of input or until a decoding
--- failure occurs, in which case it returns 'Left' with a 'I.DecodingError' and
--- a 'Producer' with any leftovers. You can use 'Pipes.Lift.errorP' to turn the
--- 'Either' return value into an 'Control.Monad.Trans.Error.ErrorT' monad
--- transformer.
---
--- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
--- entities, which is why this 'Producer' restricts its output to them. If you
--- prefer to ignore the standard and decode any 'Ae.Value', then use
--- 'U.decodeMany' from the "Pipes.Aeson.Unsafe" module.
-decodeMany
-  :: (Monad m, Ae.FromJSON b)
-  => Producer B.ByteString m r  -- ^Producer from which to draw JSON.
-  -> Producer (Int, b) m
-              (Either (I.DecodingError, Producer B.ByteString m r) r)
-decodeMany = I.consecutively decode
-{-# INLINABLE decodeMany #-}
+-- | Like 'decode', but also returns the length of input consumed in order to
+-- to decode the value.
+decodeL
+  :: (Monad m, Ae.FromJSON a)
+  => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a))
+decodeL = do
+    ev <- PA.parseL Ae.json'
+    return (case ev of
+       Left  e      -> Left (I.AttoparsecError e)
+       Right (n, v) -> case Ae.fromJSON v of
+          Ae.Error e   -> Left (I.FromJSONError e)
+          Ae.Success a -> Right (n, a))
+{-# INLINABLE decodeL #-}
+
+decoded
+  :: (Monad m, Ae.FromJSON a)
+  => (a -> Either Ae.Object Ae.Array)
+  => Lens' (Producer B.ByteString m r)
+           (Producer a m (Either (I.DecodingError, Producer B.ByteString m r) r))
+decoded f k p = fmap _encode (k (I.consecutively decode p))
+  where
+    _encode = \p0 -> do
+      er <- for p0 (\a -> encode (f a))
+      case er of
+         Left (_, p1) -> p1
+         Right r      -> return r
+    {-# INLINE _encode #-}
+{-# INLINABLE decoded #-}
+
+decodedL
+  :: (Monad m, Ae.FromJSON a)
+  => (a -> Either Ae.Object Ae.Array)
+  => Lens' (Producer B.ByteString m r)
+           (Producer (Int, a) m (Either (I.DecodingError, Producer B.ByteString m r) r))
+decodedL f k p = fmap _encode (k (I.consecutively decodeL p))
+  where
+    _encode = \p0 -> do
+      er <- for p0 (\(_, a) -> encode (f a))
+      case er of
+         Left (_, p1) -> p1
+         Right r      -> return r
+    {-# INLINE _encode #-}
+{-# INLINABLE decodedL #-}
 

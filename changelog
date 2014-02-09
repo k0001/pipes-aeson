@@ -1,3 +1,8 @@
+# HEAD
+
+* API revamped to be compatible with `pipes-parse-3.0.*`.
+
+
 # 0.2.1
 
 * Generalize `encode` from `Producer` to `Producer'`.
