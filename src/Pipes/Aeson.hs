@@ -129,16 +129,16 @@ decodeL = do
 -- you prefer to ignore the standard and encode or decode any 'Ae.Value', then
 -- use 'U.decoded' from the "Pipes.Aeson.Unsafe" module.
 decoded
-  :: (Monad m, Ae.FromJSON a)
-  => (a -> Either Ae.Object Ae.Array)
+  :: (Monad m, Ae.FromJSON a, Ae.ToJSON a)
+  => (Ae.Value -> Either Ae.Object Ae.Array)
      -- ^ A witness that @a@ can be represented either as an 'Ae.Object' or as
-     -- an 'Ae.Array'.
+     -- an 'Ae.Array'. The passed in 'Ae.Value' is @'Ae.toJSON' a@
   -> Lens' (Producer B.ByteString m r)
            (Producer a m (Either (I.DecodingError, Producer B.ByteString m r) r))
 decoded f k p0 = fmap _encode (k (I.consecutively decode p0))
   where
     _encode = \p -> do
-       er <- for p (\a -> encode (f a))
+       er <- for p (\a -> encode (f (Ae.toJSON a)))
        case er of
           Left (_, p') -> p'
           Right r      -> return r
@@ -148,16 +148,16 @@ decoded f k p0 = fmap _encode (k (I.consecutively decode p0))
 -- JSON input that was consumed in order to obtain the value, not including the
 -- length of whitespace between each parsed JSON input.
 decodedL
-  :: (Monad m, Ae.FromJSON a)
-  => (a -> Either Ae.Object Ae.Array)
+  :: (Monad m, Ae.FromJSON a, Ae.ToJSON a)
+  => (Ae.Value -> Either Ae.Object Ae.Array)
      -- ^ A witness that @a@ can be represented either as an 'Ae.Object' or as
-     -- an 'Ae.Array'.
+     -- an 'Ae.Array'. The passed in 'Ae.Value' is @'Ae.toJSON' a@
   -> Lens' (Producer B.ByteString m r)
            (Producer (Int, a) m (Either (I.DecodingError, Producer B.ByteString m r) r))
 decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
   where
     _encode = \p -> do
-      er <- for p (\(_, a) -> encode (f a))
+      er <- for p (\(_, a) -> encode (f (Ae.toJSON a)))
       case er of
          Left (_, p') -> p'
          Right r      -> return r
