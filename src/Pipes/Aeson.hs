@@ -5,6 +5,14 @@
 --
 -- This module builds on top of the @aeson@, @pipes@ and @pipes-parse@
 -- libraries, and assumes you know how to use them.
+--
+-- In this module, the following type synonym compatible with the @lens@,
+-- @lens-family@ and @lens-family-core@ libraries is used but not exported:
+--
+-- @
+-- type Lens' s a = forall f . 'Functor' f => (a -> f a) -> (s -> f s)
+-- type Iso' a b = forall f p . ('Functor' f, 'Profunctor' p) => p b (f b) -> p a (f a)
+-- @
 
 module Pipes.Aeson
   ( -- * Encoding
@@ -29,10 +37,6 @@ import qualified Pipes.Aeson.Internal             as I
 import qualified Pipes.Aeson.Unsafe               as U
 import qualified Pipes.Attoparsec                 as PA
 import qualified Pipes.Parse                      as Pipes
-
---------------------------------------------------------------------------------
-
-type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
 
 --------------------------------------------------------------------------------
 
@@ -74,16 +78,15 @@ encode (Right x) = U.encode x
 
 -- | Decodes an 'Ae.Object' or 'Ae.Array' JSON value from the underlying state.
 --
--- Returns either the decoded entitiy and the number of decoded bytes,
--- or a 'I.DecodingError' in case of failures.
+-- Returns either the decoded entitiy, or a 'I.DecodingError' in case of error.
 --
 -- /Do not/ use this function if the underlying 'Producer' has leading empty
 -- chunks or whitespace, otherwise you may get unexpected parsing errors.
 --
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
--- entities, which is why this 'Producer' restricts its output to them. If you
--- prefer to ignore the standard and decode any 'Ae.Value', then use 'U.decode'
--- from the "Pipes.Aeson.Unsafe" module.
+-- entities, which is why this 'Pipes.Parser' restricts its output to them. If
+-- you prefer to ignore the standard and decode any 'Ae.Value', then use
+-- 'U.decode' from the "Pipes.Aeson.Unsafe" module.
 decode
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Either I.DecodingError a)
@@ -94,8 +97,9 @@ decode = do
        Right (_, a) -> Right a)
 {-# INLINABLE decode #-}
 
--- | Like 'decode', but also returns the length of input consumed in order to
--- to decode the value.
+-- | Like 'decode', except it also returns the length of JSON input that was
+-- consumed in order to obtain the value, not including the length of whitespace
+-- before nor after the parsed JSON input.
 decodeL
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a))
@@ -108,33 +112,62 @@ decodeL = do
           Ae.Success a -> Right (n, a))
 {-# INLINABLE decodeL #-}
 
+
+-- | /Improper lens/ that turns a stream of raw JSON input into a stream of
+-- 'Ae.FromJSON' and back.
+--
+-- By /improper lens/ we mean that in practice you can't expect the
+-- /Monad Morphism Laws/ to be true when using 'decoded' with
+-- 'Control.Lens.zoom'.
+--
+-- @
+-- 'Control.Lens.zoom' 'decoded' ('return' r) /= 'return' r
+-- 'Control.Lens.zoom' 'decoded' (m >>= k)  /= 'Control.Lens.zoom' m >>= 'Control.Lens.zoom' . f
+-- @
+--
+-- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
+-- entities, which is why this function restricts its stream values to them. If
+-- you prefer to ignore the standard and encode or decode any 'Ae.Value', then
+-- use 'U.decoded' from the "Pipes.Aeson.Unsafe" module.
 decoded
   :: (Monad m, Ae.FromJSON a)
   => (a -> Either Ae.Object Ae.Array)
-  => Lens' (Producer B.ByteString m r)
+     -- ^ A witness that @a@ can be represented either as an 'Ae.Object' or as
+     -- an 'Ae.Array'.
+  -> Lens' (Producer B.ByteString m r)
            (Producer a m (Either (I.DecodingError, Producer B.ByteString m r) r))
-decoded f k p = fmap _encode (k (I.consecutively decode p))
+decoded f k p0 = fmap _encode (k (I.consecutively decode p0))
   where
-    _encode = \p0 -> do
-      er <- for p0 (\a -> encode (f a))
-      case er of
-         Left (_, p1) -> p1
-         Right r      -> return r
-    {-# INLINE _encode #-}
+    _encode = \p -> do
+       er <- for p (\a -> encode (f a))
+       case er of
+          Left (_, p') -> p'
+          Right r      -> return r
 {-# INLINABLE decoded #-}
 
+-- | Like 'decoded', except it also tags each decoded entity with the length of
+-- JSON input that was consumed in order to obtain the value, not including the
+-- length of whitespace between each parsed JSON input.
 decodedL
   :: (Monad m, Ae.FromJSON a)
   => (a -> Either Ae.Object Ae.Array)
+     -- ^ A witness that @a@ can be represented either as an 'Ae.Object' or as
+     -- an 'Ae.Array'.
   => Lens' (Producer B.ByteString m r)
            (Producer (Int, a) m (Either (I.DecodingError, Producer B.ByteString m r) r))
-decodedL f k p = fmap _encode (k (I.consecutively decodeL p))
+decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
   where
-    _encode = \p0 -> do
-      er <- for p0 (\(_, a) -> encode (f a))
+    _encode = \p -> do
+      er <- for p (\(_, a) -> encode (f a))
       case er of
-         Left (_, p1) -> p1
+         Left (_, p') -> p'
          Right r      -> return r
-    {-# INLINE _encode #-}
 {-# INLINABLE decodedL #-}
+
+
+
+--------------------------------------------------------------------------------
+-- Internal tools --------------------------------------------------------------
+
+type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
 

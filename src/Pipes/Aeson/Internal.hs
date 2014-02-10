@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RankNTypes         #-}
 
@@ -10,19 +9,17 @@
 module Pipes.Aeson.Internal
   ( DecodingError(..)
   , consecutively
-  , skipSpace
-  , fromLazy
   ) where
 
 import           Control.Exception                (Exception)
 import           Control.Monad.Trans.Error        (Error)
 import qualified Control.Monad.Trans.State.Strict as S
-import qualified Data.ByteString.Char8            as B
-import qualified Data.ByteString.Lazy.Internal    as BLI
-import qualified Data.Char                        as Char
+import qualified Data.ByteString                  as B
+import qualified Data.ByteString.Internal         as B (isSpaceWord8)
 import           Data.Data                        (Data, Typeable)
 import           Pipes
 import           Pipes.Attoparsec                 (ParsingError)
+import qualified Pipes.ByteString                 as PB
 import qualified Pipes.Parse                      as Pipes
 
 --------------------------------------------------------------------------------
@@ -58,11 +55,12 @@ instance Error (DecodingError, Producer a m r)
 consecutively
   :: (Monad m)
   => Pipes.Parser B.ByteString m (Either e a)
-  -> Producer B.ByteString m r  -- ^Producer from which to draw JSON.
+  -> Producer B.ByteString m r  -- ^Producer from which to draw raw input.
   -> Producer a m (Either (e, Producer B.ByteString m r) r)
 consecutively parser = step where
     step p0 = do
-      (mr, p1) <- lift (S.runStateT atEndOfBytes p0)
+      (mr, p1) <- lift $
+         S.runStateT atEndOfBytes (p0 >-> PB.dropWhile B.isSpaceWord8)
       case mr of
          Just r  -> return (Right r)
          Nothing -> do
@@ -73,32 +71,12 @@ consecutively parser = step where
 {-# INLINABLE consecutively #-}
 
 --------------------------------------------------------------------------------
--- Internal stuff
-
--- Sends each of the 'BLI.ByteString''s strict chunks downstream.
-fromLazy :: Monad m => BLI.ByteString -> Producer' B.ByteString m ()
-fromLazy = BLI.foldrChunks (\e a -> yield e >> a) (return ())
-{-# INLINABLE fromLazy #-}
-
--- | Consumes and discards leading 'B.ByteString' characters from upstream as
--- long as the given predicate holds 'True'.
-skipSpace :: Monad m => S.StateT (Producer B.ByteString m r) m ()
-skipSpace = do
-    ma <- Pipes.draw
-    case ma of
-      Nothing -> return ()
-      Just a  -> do
-        let a' = B.dropWhile Char.isSpace a
-        if B.null a'
-           then skipSpace
-           else Pipes.unDraw a'
-{-# INLINABLE skipSpace #-}
+-- Internal tools --------------------------------------------------------------
 
 -- | Returns @'Just' r@ if the producer has reached end of input, otherwise
 -- 'Nothing'.
 atEndOfBytes :: Monad m => S.StateT (Producer B.ByteString m r) m (Maybe r)
-atEndOfBytes  = step =<< S.get
-  where
+atEndOfBytes = step =<< S.get where
     step p0 = do
       x <- lift (next p0)
       case x of

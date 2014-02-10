@@ -21,29 +21,26 @@ import           Pipes
 import qualified Pipes.Parse as Pipes
 import qualified Pipes.Aeson.Internal             as I
 import qualified Pipes.Attoparsec                 as PA
+import qualified Pipes.ByteString                 as PB
 import qualified Data.Aeson                       as Ae
 import qualified Data.Aeson.Parser                as Ae (value')
 import qualified Data.ByteString                  as B
 
 --------------------------------------------------------------------------------
 
-type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
-
---------------------------------------------------------------------------------
-
 -- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance,
 -- not just 'Ae.Array' or 'Ae.Object'.
 encode :: (Monad m, Ae.ToJSON a) => a -> Producer' B.ByteString m ()
-encode = I.fromLazy . Ae.encode
+encode = \a -> PB.fromLazy (Ae.encode a)
 {-# INLINABLE encode #-}
 {-# RULES "p >-> for cat encode" forall p .
-    p >-> for cat encode = for p (\a -> I.fromLazy (Ae.encode a))
+    p >-> for cat encode = for p (\a -> PB.fromLazy (Ae.encode a))
   #-}
 
 --------------------------------------------------------------------------------
 
--- | Like 'Pipes.Aeson.decode', except it will decode any 'Ae.ToJSON' instance,
--- not just 'Ae.Array' or 'Ae.Object'.
+-- | Like 'Pipes.Aeson.decode', except it will decode any 'Ae.FromJSON'
+-- instance, not just 'Ae.Array' or 'Ae.Object'.
 decode
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Either I.DecodingError a)
@@ -55,8 +52,9 @@ decode = do
 {-# INLINABLE decode #-}
 
 
--- | Like 'decode', but also returns the length of input consumed to parse the
--- value.
+-- | Like 'decode', except it also returns the length of JSON input that was
+-- consumed in order to obtain the value, not including the length of whitespace
+-- between each parsed JSON input.
 decodeL
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a))
@@ -69,6 +67,8 @@ decodeL = do
           Ae.Success a -> Right (n, a))
 {-# INLINABLE decodeL #-}
 
+-- | Like 'Pipes.Aeson.decoded', except it will decode and decode any
+-- 'Ae.FromJSON' and 'Ae.ToJSON' instance, not just 'Ae.Array' or 'Ae.Object'.
 decoded
   :: (Monad m, Ae.FromJSON a, Ae.ToJSON a)
   => Lens' (Producer B.ByteString m r)
@@ -84,6 +84,9 @@ decoded k p = fmap _encode (k (I.consecutively decode p))
 {-# INLINABLE decoded #-}
 
 
+-- | Like 'decoded', except it also tags each decoded entity with the length of
+-- JSON input that was consumed in order to obtain the value, not including the
+-- length of whitespace between each parsed JSON input.
 decodedL
   :: (Monad m, Ae.FromJSON a, Ae.ToJSON a)
   => Lens' (Producer B.ByteString m r)
@@ -98,3 +101,8 @@ decodedL k p = fmap _encode (k (I.consecutively decodeL p))
     {-# INLINE _encode #-}
 {-# INLINABLE decodedL #-}
 
+
+--------------------------------------------------------------------------------
+-- Internal tools --------------------------------------------------------------
+
+type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
