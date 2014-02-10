@@ -11,7 +11,6 @@
 --
 -- @
 -- type Lens' s a = forall f . 'Functor' f => (a -> f a) -> (s -> f s)
--- type Iso' a b = forall f p . ('Functor' f, 'Profunctor' p) => p b (f b) -> p a (f a)
 -- @
 
 module Pipes.Aeson
@@ -163,7 +162,6 @@ decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
          Left (_, p') -> p'
          Right r      -> return r
 {-# INLINABLE decodedL #-}
-
 
 
 --------------------------------------------------------------------------------

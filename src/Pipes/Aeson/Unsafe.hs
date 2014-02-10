@@ -43,7 +43,7 @@ encode = \a -> PB.fromLazy (Ae.encode a)
 -- instance, not just 'Ae.Array' or 'Ae.Object'.
 decode
   :: (Monad m, Ae.FromJSON a)
-  => Pipes.Parser B.ByteString m (Either I.DecodingError a)
+  => Pipes.Parser B.ByteString m (Either I.DecodingError a) -- ^
 decode = do
     x <- decodeL
     return (case x of
@@ -57,7 +57,7 @@ decode = do
 -- between each parsed JSON input.
 decodeL
   :: (Monad m, Ae.FromJSON a)
-  => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a))
+  => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a)) -- ^
 decodeL = do
     ev <- PA.parseL Ae.value'
     return (case ev of
@@ -73,6 +73,7 @@ decoded
   :: (Monad m, Ae.FromJSON a, Ae.ToJSON a)
   => Lens' (Producer B.ByteString m r)
            (Producer a m (Either (I.DecodingError, Producer B.ByteString m r) r))
+     -- ^
 decoded k p = fmap _encode (k (I.consecutively decode p))
   where
     _encode = \p0 -> do
@@ -91,6 +92,7 @@ decodedL
   :: (Monad m, Ae.FromJSON a, Ae.ToJSON a)
   => Lens' (Producer B.ByteString m r)
            (Producer (Int, a) m (Either (I.DecodingError, Producer B.ByteString m r) r))
+     -- ^
 decodedL k p = fmap _encode (k (I.consecutively decodeL p))
   where
     _encode = \p0 -> do
