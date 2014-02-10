@@ -153,7 +153,7 @@ decodedL
   => (a -> Either Ae.Object Ae.Array)
      -- ^ A witness that @a@ can be represented either as an 'Ae.Object' or as
      -- an 'Ae.Array'.
-  => Lens' (Producer B.ByteString m r)
+  -> Lens' (Producer B.ByteString m r)
            (Producer (Int, a) m (Either (I.DecodingError, Producer B.ByteString m r) r))
 decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
   where
