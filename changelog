@@ -2,6 +2,8 @@
 
 * API revamped to be compatible with `pipes-parse-3.0.*`.
 
+* Renamed `Pipes.Aeson.Unsafe` module to `Pipes.Aeson.Unchecked`.
+
 
 # 0.2.1
 

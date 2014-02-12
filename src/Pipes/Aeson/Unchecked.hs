@@ -6,7 +6,7 @@
 -- not only 'Ae.Object's or 'Ae.Array's, according to to the RFC-4627 JSON
 -- standard.
 
-module Pipes.Aeson.Unsafe
+module Pipes.Aeson.Unchecked
   ( -- * Encoding
     encode
     -- * Decoding

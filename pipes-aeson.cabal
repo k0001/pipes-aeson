@@ -27,7 +27,7 @@ source-repository head
 library
   hs-source-dirs:  src
   exposed-modules: Pipes.Aeson
-                   Pipes.Aeson.Unsafe
+                   Pipes.Aeson.Unchecked
   other-modules:   Pipes.Aeson.Internal
   build-depends:
       aeson            (>=0.6.1 && <0.8)

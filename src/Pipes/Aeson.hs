@@ -30,13 +30,13 @@ module Pipes.Aeson
   , I.DecodingError(..)
   ) where
 
-import qualified Data.Aeson                       as Ae
-import qualified Data.ByteString.Char8            as B
+import qualified Data.Aeson            as Ae
+import qualified Data.ByteString.Char8 as B
 import           Pipes
-import qualified Pipes.Aeson.Internal             as I
-import qualified Pipes.Aeson.Unsafe               as U
-import qualified Pipes.Attoparsec                 as PA
-import qualified Pipes.Parse                      as Pipes
+import qualified Pipes.Aeson.Internal  as I
+import qualified Pipes.Aeson.Unchecked as U
+import qualified Pipes.Attoparsec      as PA
+import qualified Pipes.Parse           as Pipes
 
 --------------------------------------------------------------------------------
 
@@ -46,7 +46,7 @@ import qualified Pipes.Parse                      as Pipes
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
 -- entities, which is why this function restricts its input to them. If you
 -- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'
--- from the "Pipes.Aeson.Unsafe" module.
+-- from the "Pipes.Aeson.Unchecked" module.
 --
 -- /Hint:/ You can easily turn this 'Producer'' into a 'Pipe' that encodes
 -- 'Ae.Array' or 'Ae.Object' values as JSON as they flow downstream using:
@@ -86,7 +86,7 @@ encode (Right x) = U.encode x
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
 -- entities, which is why this 'Pipes.Parser' restricts its output to them. If
 -- you prefer to ignore the standard and decode any 'Ae.Value', then use
--- 'U.decode' from the "Pipes.Aeson.Unsafe" module.
+-- 'U.decode' from the "Pipes.Aeson.Unchecked" module.
 decode
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Either I.DecodingError a)
@@ -128,7 +128,7 @@ decodeL = do
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
 -- entities, which is why this function restricts its stream values to them. If
 -- you prefer to ignore the standard and encode or decode any 'Ae.Value', then
--- use 'U.decoded' from the "Pipes.Aeson.Unsafe" module.
+-- use 'U.decoded' from the "Pipes.Aeson.Unchecked" module.
 decoded
   :: (Monad m, Ae.FromJSON a, Ae.ToJSON a)
   => (Ae.Value -> Either Ae.Object Ae.Array)
