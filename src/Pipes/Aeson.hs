@@ -4,7 +4,8 @@
 -- through Pipes streams.
 --
 -- This module builds on top of the @aeson@, @pipes@ and @pipes-parse@
--- libraries, and assumes you know how to use them.
+-- libraries, and assumes you know how to use them. Please read the examples
+-- in "Pipes.Parse.Tutorial" to understand how to use these functions.
 --
 -- In this module, the following type synonym compatible with the @lens@,
 -- @lens-family@ and @lens-family-core@ libraries is used but not exported:
@@ -64,7 +65,7 @@ encode (Right x) = U.encode x
 --------------------------------------------------------------------------------
 -- $decoding
 --
--- Decoding JSON as a Haskell value in involves two different steps:
+-- Decoding JSON as a Haskell value involves two different steps:
 --
 -- * Parsing a raw JSON 'B.ByteString' into an 'Ae.Object' or an 'Ae.Array'.
 --
@@ -72,7 +73,7 @@ encode (Right x) = U.encode x
 -- 'Ae.FromJSON' instance.
 --
 -- Any of those steps can fail, in which case a 'I.DecodingError' will report
--- the precise error and at which the step it appened.
+-- the precise error and at which the step it happened.
 
 
 -- | Decodes an 'Ae.Object' or 'Ae.Array' JSON value from the underlying state.
