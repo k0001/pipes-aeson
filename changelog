@@ -1,4 +1,4 @@
-# HEAD
+# 0.3.0
 
 * API revamped to be compatible with `pipes-parse-3.0.*`.
 
