@@ -59,29 +59,12 @@ consecutively
   -> Producer a m (Either (e, Producer B.ByteString m r) r)
 consecutively parser = step where
     step p0 = do
-      (mr, p1) <- lift $
-         S.runStateT atEndOfBytes (p0 >-> PB.dropWhile B.isSpaceWord8)
-      case mr of
-         Just r  -> return (Right r)
-         Nothing -> do
-            (ea, p2) <- lift (S.runStateT parser p1)
+      x <- lift $ next (p0 >-> PB.dropWhile B.isSpaceWord8)
+      case x of
+         Left r -> return (Right r)
+         Right (bs, p1) -> do
+            (ea, p2) <- lift $ S.runStateT parser (yield bs >> p1)
             case ea of
                Left  e -> return (Left (e, p2))
                Right a -> yield a >> step p2
 {-# INLINABLE consecutively #-}
-
---------------------------------------------------------------------------------
--- Internal tools --------------------------------------------------------------
-
--- | Returns @'Just' r@ if the producer has reached end of input, otherwise
--- 'Nothing'.
-atEndOfBytes :: Monad m => S.StateT (Producer B.ByteString m r) m (Maybe r)
-atEndOfBytes = step =<< S.get where
-    step p0 = do
-      x <- lift (next p0)
-      case x of
-         Left r       -> S.put (return r) >> return (Just r)
-         Right (a,p1)
-          | B.null a  -> step p1
-          | otherwise -> S.put (yield a >> p1) >> return Nothing
-{-# INLINABLE atEndOfBytes #-}
