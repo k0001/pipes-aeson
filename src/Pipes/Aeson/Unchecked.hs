@@ -17,14 +17,13 @@ module Pipes.Aeson.Unchecked
   , decodedL
   ) where
 
+import qualified Data.Aeson           as Ae
+import qualified Data.Aeson.Parser    as Ae (value')
+import qualified Data.ByteString      as B
 import           Pipes
-import qualified Pipes.Parse as Pipes
-import qualified Pipes.Aeson.Internal             as I
-import qualified Pipes.Attoparsec                 as PA
-import qualified Pipes.ByteString                 as PB
-import qualified Data.Aeson                       as Ae
-import qualified Data.Aeson.Parser                as Ae (value')
-import qualified Data.ByteString                  as B
+import qualified Pipes.Aeson.Internal as I
+import qualified Pipes.ByteString     as PB
+import qualified Pipes.Parse          as Pipes
 
 --------------------------------------------------------------------------------
 
@@ -58,13 +57,7 @@ decode = do
 decodeL
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a)) -- ^
-decodeL = do
-    ev <- PA.parseL Ae.value'
-    return (case ev of
-       Left  e      -> Left (I.AttoparsecError e)
-       Right (n, v) -> case Ae.fromJSON v of
-          Ae.Error e   -> Left (I.FromJSONError e)
-          Ae.Success a -> Right (n, a))
+decodeL = I.decodeL Ae.value'
 {-# INLINABLE decodeL #-}
 
 -- | Like 'Pipes.Aeson.decoded', except it will decode and decode any

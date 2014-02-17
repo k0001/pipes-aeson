@@ -36,7 +36,6 @@ import qualified Data.ByteString.Char8 as B
 import           Pipes
 import qualified Pipes.Aeson.Internal  as I
 import qualified Pipes.Aeson.Unchecked as U
-import qualified Pipes.Attoparsec      as PA
 import qualified Pipes.Parse           as Pipes
 
 --------------------------------------------------------------------------------
@@ -111,13 +110,7 @@ decode = do
 decodeL
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a))
-decodeL = do
-    ev <- PA.parseL Ae.json'
-    return (case ev of
-       Left  e      -> Left (I.AttoparsecError e)
-       Right (n, v) -> case Ae.fromJSON v of
-          Ae.Error e   -> Left (I.FromJSONError e)
-          Ae.Success a -> Right (n, a))
+decodeL = I.decodeL Ae.json'
 {-# INLINABLE decodeL #-}
 
 
