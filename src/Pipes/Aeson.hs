@@ -16,7 +16,8 @@
 
 module Pipes.Aeson
   ( -- * Encoding
-    encode
+    encodeArray
+    , encodeObject
 
     -- * Decoding
     -- $decoding
@@ -39,6 +40,13 @@ import qualified Pipes.Attoparsec      as PA
 import qualified Pipes.Parse           as Pipes
 
 --------------------------------------------------------------------------------
+-- | Encode an 'Ae.Object' as JSON and send it downstream,
+encodeObject :: Monad m => Ae.Object -> Producer' B.ByteString m ()
+encodeObject = U.encode
+
+-- | Encode an 'Ae.Array' as JSON and send it downstream,
+encodeArray :: Monad m => Ae.Array -> Producer' B.ByteString m ()
+encodeArray = U.encode
 
 -- | Encode an 'Ae.Array' or 'Ae.Object' as JSON and send it downstream,
 -- possibly in more than one 'B.ByteString' chunk.
