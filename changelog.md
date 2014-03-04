@@ -1,3 +1,10 @@
+# HEAD
+
+* Deprecate `Pipes.Aeson.encode` in favour of `encodeObject` and
+  `encodeArray`.
+
+
+
 # 0.3.0
 
 * API revamped to be compatible with `pipes-parse-3.0.*`.
