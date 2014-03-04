@@ -72,6 +72,13 @@ consecutively parser = step where
 {-# INLINABLE consecutively #-}
 
 
+-- | Decodes a 'Ae.FromJSON' value from the underlying state using the given
+-- 'Attoparsec.Parser' in order to obtain an 'Ae.Value' first.
+--
+-- Returns either the decoded entitiy, or a 'I.DecodingError' in case of error.
+--
+-- /Do not/ use this function if the underlying 'Producer' has leading empty
+-- chunks or whitespace, otherwise you may get unexpected parsing errors.
 decodeL
   :: (Monad m, Ae.FromJSON a)
   => Attoparsec.Parser B.ByteString Ae.Value
