@@ -17,7 +17,7 @@
 module Pipes.Aeson
   ( -- * Encoding
     encodeArray
-    , encodeObject
+  , encodeObject
 
     -- * Decoding
     -- $decoding
@@ -29,6 +29,9 @@ module Pipes.Aeson
 
     -- * Types
   , I.DecodingError(..)
+
+    -- * Deprecated
+  , encode
   ) where
 
 import qualified Data.Aeson            as Ae
@@ -39,6 +42,7 @@ import qualified Pipes.Aeson.Unchecked as U
 import qualified Pipes.Parse           as Pipes
 
 --------------------------------------------------------------------------------
+
 -- | Encode an 'Ae.Object' as JSON and send it downstream,
 encodeObject :: Monad m => Ae.Object -> Producer' B.ByteString m ()
 encodeObject = U.encode
@@ -64,6 +68,7 @@ encodeArray = U.encode
 encode :: Monad m => Either Ae.Object Ae.Array -> Producer' B.ByteString m ()
 encode (Left  x) = U.encode x
 encode (Right x) = U.encode x
+{-# DEPRECATED encode "Use encodeObject or encodeArray instead" #-}
 {-# INLINABLE encode #-}
 {-# RULES "p >-> for cat encode" forall p .
     p >-> for cat encode = for p (\a -> encode a)
