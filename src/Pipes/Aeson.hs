@@ -16,6 +16,7 @@
 
 module Pipes.Aeson
   ( -- * Encoding
+    -- $encoding
     encodeArray
   , encodeObject
 
@@ -42,12 +43,36 @@ import qualified Pipes.Aeson.Unchecked as U
 import qualified Pipes.Parse           as Pipes
 
 --------------------------------------------------------------------------------
+-- $encoding
+--
+-- Encode 'Ae.Array' or 'Ae.Object' values as JSON and send them downstream,
+-- possibly in more than one 'B.ByteString' chunk.
+--
+-- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
+-- entities, which is why these functions restrict their input to them. If you
+-- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'
+-- from the "Pipes.Aeson.Unchecked" module.
+--
 
 -- | Encode an 'Ae.Object' as JSON and send it downstream,
+--
+-- /Hint:/ You can easily turn this 'Producer'' into a 'Pipe' that encodes
+-- 'Ae.Object' values as JSON as they flow downstream using:
+--
+-- @
+-- 'for' 'cat' 'encodeObject' :: 'Monad' m => 'Pipe' 'Ae.Object' 'B.ByteString' m r
+-- @
 encodeObject :: Monad m => Ae.Object -> Producer' B.ByteString m ()
 encodeObject = U.encode
 
 -- | Encode an 'Ae.Array' as JSON and send it downstream,
+--
+-- /Hint:/ You can easily turn this 'Producer'' into a 'Pipe' that encodes
+-- 'Ae.Array' values as JSON as they flow downstream using:
+--
+-- @
+-- 'for' 'cat' 'encodeArray' :: 'Monad' m => 'Pipe' 'Ae.Array' 'B.ByteString' m r
+-- @
 encodeArray :: Monad m => Ae.Array -> Producer' B.ByteString m ()
 encodeArray = U.encode
 
@@ -68,7 +93,7 @@ encodeArray = U.encode
 encode :: Monad m => Either Ae.Object Ae.Array -> Producer' B.ByteString m ()
 encode (Left  x) = U.encode x
 encode (Right x) = U.encode x
-{-# DEPRECATED encode "Use encodeObject or encodeArray instead" #-}
+{-# DEPRECATED encode "Use encodeObject or encodeArray instead. This will be removed in the next major version" #-}
 {-# INLINABLE encode #-}
 {-# RULES "p >-> for cat encode" forall p .
     p >-> for cat encode = for p (\a -> encode a)
