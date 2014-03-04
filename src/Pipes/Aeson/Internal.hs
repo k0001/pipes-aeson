@@ -9,16 +9,18 @@
 module Pipes.Aeson.Internal
   ( DecodingError(..)
   , consecutively
+  , decodeL
   ) where
-
 import           Control.Exception                (Exception)
 import           Control.Monad.Trans.Error        (Error)
 import qualified Control.Monad.Trans.State.Strict as S
+import qualified Data.Aeson                       as Ae
+import qualified Data.Attoparsec.Types            as Attoparsec
 import qualified Data.ByteString                  as B
 import qualified Data.ByteString.Internal         as B (isSpaceWord8)
 import           Data.Data                        (Data, Typeable)
 import           Pipes
-import           Pipes.Attoparsec                 (ParsingError)
+import qualified Pipes.Attoparsec                 as PA
 import qualified Pipes.ByteString                 as PB
 import qualified Pipes.Parse                      as Pipes
 
@@ -26,7 +28,7 @@ import qualified Pipes.Parse                      as Pipes
 
 -- | An error while decoding a JSON value.
 data DecodingError
-  = AttoparsecError ParsingError
+  = AttoparsecError PA.ParsingError
     -- ^An @attoparsec@ error that happened while parsing the raw JSON string.
   | FromJSONError String
     -- ^An @aeson@ error that happened while trying to convert a
@@ -68,3 +70,24 @@ consecutively parser = step where
                Left  e -> return (Left (e, p2))
                Right a -> yield a >> step p2
 {-# INLINABLE consecutively #-}
+
+
+-- | Decodes a 'Ae.FromJSON' value from the underlying state using the given
+-- 'Attoparsec.Parser' in order to obtain an 'Ae.Value' first.
+--
+-- Returns either the decoded entitiy, or a 'I.DecodingError' in case of error.
+--
+-- /Do not/ use this function if the underlying 'Producer' has leading empty
+-- chunks or whitespace, otherwise you may get unexpected parsing errors.
+decodeL
+  :: (Monad m, Ae.FromJSON a)
+  => Attoparsec.Parser B.ByteString Ae.Value
+  -> Pipes.Parser B.ByteString m (Either DecodingError (Int, a)) -- ^
+decodeL parser = do
+    ev <- PA.parseL parser
+    return (case ev of
+      Left  e      -> Left (AttoparsecError e)
+      Right (n, v) -> case Ae.fromJSON v of
+        Ae.Error e   -> Left (FromJSONError e)
+        Ae.Success a -> Right (n, a))
+{-# INLINABLE decodeL #-}
