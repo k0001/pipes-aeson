@@ -64,6 +64,10 @@ import qualified Pipes.Parse           as Pipes
 -- @
 encodeObject :: Monad m => Ae.Object -> Producer' B.ByteString m ()
 encodeObject = U.encode
+{-# INLINABLE encodeObject #-}
+{-# RULES "p >-> for cat encodeObject" forall p .
+    p >-> for cat encodeObject = for p encodeObject
+  #-}
 
 -- | Encode an 'Ae.Array' as JSON and send it downstream,
 --
@@ -75,6 +79,10 @@ encodeObject = U.encode
 -- @
 encodeArray :: Monad m => Ae.Array -> Producer' B.ByteString m ()
 encodeArray = U.encode
+{-# INLINABLE encodeArray #-}
+{-# RULES "p >-> for cat encodeArray" forall p .
+    p >-> for cat encodeArray = for p encodeArray
+  #-}
 
 -- | Encode an 'Ae.Array' or 'Ae.Object' as JSON and send it downstream,
 -- possibly in more than one 'B.ByteString' chunk.
