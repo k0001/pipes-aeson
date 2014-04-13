@@ -86,8 +86,9 @@ decodeL
 decodeL parser = do
     ev <- PA.parseL parser
     return (case ev of
-      Left  e      -> Left (AttoparsecError e)
-      Right (n, v) -> case Ae.fromJSON v of
+      Nothing             -> Left (AttoparsecError (PA.ParsingError [] "Failed reading: not enough bytes"))
+      Just (Left  e)      -> Left (AttoparsecError e)
+      Just (Right (n, v)) -> case Ae.fromJSON v of
         Ae.Error e   -> Left (FromJSONError e)
         Ae.Success a -> Right (n, a))
 {-# INLINABLE decodeL #-}
