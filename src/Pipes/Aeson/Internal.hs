@@ -77,8 +77,8 @@ consecutively parser = step where
 --
 -- Returns either the decoded entitiy, or a 'I.DecodingError' in case of error.
 --
--- /Do not/ use this function if the underlying 'Producer' has leading empty
--- chunks or whitespace, otherwise you may get unexpected parsing errors.
+-- It returns 'Nothing' if the underlying 'Producer' is exhausted, otherwise
+-- it returns either the decoded entity or a 'I.DecodingError' in case of error.
 decodeL
   :: (Monad m, Ae.FromJSON a)
   => Attoparsec.Parser B.ByteString Ae.Value

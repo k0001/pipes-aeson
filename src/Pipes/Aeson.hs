@@ -126,8 +126,8 @@ encode (Right x) = U.encode x
 --
 -- Returns either the decoded entitiy, or a 'I.DecodingError' in case of error.
 --
--- /Do not/ use this function if the underlying 'Producer' has leading empty
--- chunks or whitespace, otherwise you may get unexpected parsing errors.
+-- It returns 'Nothing' if the underlying 'Producer' is exhausted, otherwise
+-- it returns either the decoded entity or a 'I.DecodingError' in case of error.
 --
 -- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
 -- entities, which is why this 'Pipes.Parser' restricts its output to them. If
