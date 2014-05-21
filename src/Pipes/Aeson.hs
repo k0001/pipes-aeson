@@ -30,9 +30,6 @@ module Pipes.Aeson
 
     -- * Types
   , I.DecodingError(..)
-
-    -- * Deprecated
-  , encode
   ) where
 
 import           Control.Monad         (liftM)
@@ -83,29 +80,6 @@ encodeArray = U.encode
 {-# INLINABLE encodeArray #-}
 {-# RULES "p >-> for cat encodeArray" forall p .
     p >-> for cat encodeArray = for p encodeArray
-  #-}
-
--- | Encode an 'Ae.Array' or 'Ae.Object' as JSON and send it downstream,
--- possibly in more than one 'B.ByteString' chunk.
---
--- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
--- entities, which is why this function restricts its input to them. If you
--- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'
--- from the "Pipes.Aeson.Unchecked" module.
---
--- /Hint:/ You can easily turn this 'Producer'' into a 'Pipe' that encodes
--- 'Ae.Array' or 'Ae.Object' values as JSON as they flow downstream using:
---
--- @
--- 'for' 'cat' 'encode' :: ('Monad' m) => 'Pipe' ('Either' 'Ae.Object' 'Ae.Array') 'B.ByteString' m r
--- @
-encode :: Monad m => Either Ae.Object Ae.Array -> Producer' B.ByteString m ()
-encode (Left  x) = U.encode x
-encode (Right x) = U.encode x
-{-# DEPRECATED encode "Use encodeObject or encodeArray instead. This will be removed in the next major version" #-}
-{-# INLINABLE encode #-}
-{-# RULES "p >-> for cat encode" forall p .
-    p >-> for cat encode = for p (\a -> encode a)
   #-}
 
 --------------------------------------------------------------------------------
@@ -175,7 +149,7 @@ decoded
 decoded f k p0 = fmap _encode (k (I.consecutively decode p0))
   where
     _encode = \p -> do
-       er <- for p (\a -> encode (f (Ae.toJSON a)))
+       er <- for p (\a -> either encodeObject encodeArray (f (Ae.toJSON a)))
        case er of
           Left (_, p') -> p'
           Right r      -> return r
@@ -194,7 +168,7 @@ decodedL
 decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
   where
     _encode = \p -> do
-      er <- for p (\(_, a) -> encode (f (Ae.toJSON a)))
+      er <- for p (\(_, a) -> either encodeObject encodeArray (f (Ae.toJSON a)))
       case er of
          Left (_, p') -> p'
          Right r      -> return r
