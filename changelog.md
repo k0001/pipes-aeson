@@ -1,8 +1,17 @@
-# HEAD
+# 0.4
 
-* Deprecate `Pipes.Aeson.encode` in favour of `encodeObject` and
+* Remove `Pipes.Aeson.encode` in favour of `encodeObject` and
   `encodeArray`.
 
+* `decode` and `decodeL` now return `Nothing` on end of input, instead
+  of failing with a `DecodingError`. This follows the approach taken
+  by `pipes-attoparsec-0.5`.
+
+* Solved quadratic time complexity issue when decoding (#10).
+
+* Depend on `pipes-attoparsec-0.5.*`.
+
+* Raise upper bound for `transformers` to `0.4.*`.
 
 
 # 0.3.0
@@ -16,7 +25,7 @@
 
 * Generalize `encode` from `Producer` to `Producer'`.
 
-* Depend on newer versions of `aeson`, `attoparsec`, `pipes-attoparsec.
+* Depend on newer versions of `aeson`, `attoparsec`, `pipes-attoparsec`.
 
 
 # 0.2.0
