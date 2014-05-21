@@ -21,7 +21,6 @@ import qualified Data.ByteString.Internal         as B (isSpaceWord8)
 import           Data.Data                        (Data, Typeable)
 import           Pipes
 import qualified Pipes.Attoparsec                 as PA
-import qualified Pipes.ByteString                 as PB
 import qualified Pipes.Parse                      as Pipes
 
 --------------------------------------------------------------------------------
@@ -56,19 +55,20 @@ instance Error (DecodingError, Producer a m r)
 -- monad transformer.
 consecutively
   :: (Monad m)
-  => Pipes.Parser B.ByteString m (Either e a)
+  => Pipes.Parser B.ByteString m (Maybe (Either e a))
   -> Producer B.ByteString m r  -- ^Producer from which to draw raw input.
   -> Producer a m (Either (e, Producer B.ByteString m r) r)
 consecutively parser = step where
     step p0 = do
-      x <- lift $ next (p0 >-> PB.dropWhile B.isSpaceWord8)
+      x <- lift $ nextSkipBlank p0
       case x of
          Left r -> return (Right r)
          Right (bs, p1) -> do
-            (ea, p2) <- lift $ S.runStateT parser (yield bs >> p1)
-            case ea of
-               Left  e -> return (Left (e, p2))
-               Right a -> yield a >> step p2
+            (mea, p2) <- lift $ S.runStateT parser (yield bs >> p1)
+            case mea of
+               Just (Right a) -> yield a >> step p2
+               Just (Left  e) -> return (Left (e, p2))
+               Nothing -> error "Pipes.Aeson.Internal.consecutively: impossible"
 {-# INLINABLE consecutively #-}
 
 
@@ -82,12 +82,33 @@ consecutively parser = step where
 decodeL
   :: (Monad m, Ae.FromJSON a)
   => Attoparsec.Parser B.ByteString Ae.Value
-  -> Pipes.Parser B.ByteString m (Either DecodingError (Int, a)) -- ^
+  -> Pipes.Parser B.ByteString m (Maybe (Either DecodingError (Int, a))) -- ^
 decodeL parser = do
-    ev <- PA.parseL parser
-    return (case ev of
-      Left  e      -> Left (AttoparsecError e)
-      Right (n, v) -> case Ae.fromJSON v of
-        Ae.Error e   -> Left (FromJSONError e)
-        Ae.Success a -> Right (n, a))
+    mev <- PA.parseL parser
+    return $ case mev of
+       Nothing             -> Nothing
+       Just (Left l)       -> Just (Left (AttoparsecError l))
+       Just (Right (n, v)) -> case Ae.fromJSON v of
+          Ae.Error e   -> Just (Left (FromJSONError e))
+          Ae.Success a -> Just (Right (n, a))
 {-# INLINABLE decodeL #-}
+
+
+--------------------------------------------------------------------------------
+-- Internal stuff
+
+-- | Like 'Pipes.next', except it skips leading whitespace and 'B.null' chunks.
+nextSkipBlank
+  :: (Monad m)
+  => Producer B.ByteString m r
+  -> m (Either r (B.ByteString, Producer B.ByteString m r))
+nextSkipBlank = go where
+    go p0 = do
+      x <- next p0
+      case x of
+         Left  _      -> return x
+         Right (a,p1) -> do
+            let a' = B.dropWhile B.isSpaceWord8 a
+            if B.null a' then go p1
+                         else return (Right (a', p1))
+{-# INLINABLE nextSkipBlank #-}

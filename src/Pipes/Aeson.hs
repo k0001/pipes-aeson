@@ -35,6 +35,7 @@ module Pipes.Aeson
   , encode
   ) where
 
+import           Control.Monad         (liftM)
 import qualified Data.Aeson            as Ae
 import qualified Data.ByteString.Char8 as B
 import           Pipes
@@ -134,12 +135,8 @@ encode (Right x) = U.encode x
 -- 'U.decode' from the "Pipes.Aeson.Unchecked" module.
 decode
   :: (Monad m, Ae.FromJSON a)
-  => Pipes.Parser B.ByteString m (Either I.DecodingError a)
-decode = do
-    x <- decodeL
-    return (case x of
-       Left   e     -> Left  e
-       Right (_, a) -> Right a)
+  => Pipes.Parser B.ByteString m (Maybe (Either I.DecodingError a))
+decode = fmap (fmap snd) `liftM` decodeL
 {-# INLINABLE decode #-}
 
 -- | Like 'decode', except it also returns the length of JSON input that was
@@ -147,7 +144,7 @@ decode = do
 -- before nor after the parsed JSON input.
 decodeL
   :: (Monad m, Ae.FromJSON a)
-  => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a))
+  => Pipes.Parser B.ByteString m (Maybe (Either I.DecodingError (Int, a)))
 decodeL = I.decodeL Ae.json'
 {-# INLINABLE decodeL #-}
 
@@ -208,4 +205,3 @@ decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
 -- Internal tools --------------------------------------------------------------
 
 type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
-

@@ -17,6 +17,7 @@ module Pipes.Aeson.Unchecked
   , decodedL
   ) where
 
+import           Control.Monad        (liftM)
 import qualified Data.Aeson           as Ae
 import qualified Data.Aeson.Parser    as Ae (value')
 import qualified Data.ByteString      as B
@@ -42,12 +43,8 @@ encode = PB.fromLazy . Ae.encode
 -- instance, not just 'Ae.Array' or 'Ae.Object'.
 decode
   :: (Monad m, Ae.FromJSON a)
-  => Pipes.Parser B.ByteString m (Either I.DecodingError a) -- ^
-decode = do
-    x <- decodeL
-    return (case x of
-       Left   e     -> Left e
-       Right (_, a) -> Right a)
+  => Pipes.Parser B.ByteString m ((Maybe (Either I.DecodingError a))) -- ^
+decode = fmap (fmap snd) `liftM` decodeL
 {-# INLINABLE decode #-}
 
 
@@ -56,7 +53,7 @@ decode = do
 -- between each parsed JSON input.
 decodeL
   :: (Monad m, Ae.FromJSON a)
-  => Pipes.Parser B.ByteString m (Either I.DecodingError (Int, a)) -- ^
+  => Pipes.Parser B.ByteString m (Maybe (Either I.DecodingError (Int, a))) -- ^
 decodeL = I.decodeL Ae.value'
 {-# INLINABLE decodeL #-}
 
