@@ -1,3 +1,8 @@
+# 0.4.1
+
+* Raise upper bound dependency on `attoparsec`.
+
+
 # 0.4
 
 * Remove `Pipes.Aeson.encode` in favour of `encodeObject` and
