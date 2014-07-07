@@ -1,3 +1,8 @@
+# 0.4.1.1
+
+* Raise upper bound dependency on `pipes-bytestring`.
+
+
 # 0.4.1
 
 * Raise upper bound dependency on `attoparsec`.
