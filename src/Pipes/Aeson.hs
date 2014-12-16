@@ -93,12 +93,10 @@ encodeArray = U.encode
 -- 'Ae.FromJSON' instance.
 --
 -- Any of those steps can fail, in which case a 'I.DecodingError' will report
--- the precise error and at which the step it happened.
+-- the precise error and at which step it happened.
 
 
 -- | Decodes an 'Ae.Object' or 'Ae.Array' JSON value from the underlying state.
---
--- Returns either the decoded entitiy, or a 'I.DecodingError' in case of error.
 --
 -- It returns 'Nothing' if the underlying 'Producer' is exhausted, otherwise
 -- it returns either the decoded entity or a 'I.DecodingError' in case of error.
@@ -178,4 +176,4 @@ decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
 --------------------------------------------------------------------------------
 -- Internal tools --------------------------------------------------------------
 
-type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
+type Lens' s a = forall f . Functor f => (a -> f a) -> s -> f s

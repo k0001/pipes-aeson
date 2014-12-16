@@ -75,8 +75,6 @@ consecutively parser = step where
 -- | Decodes a 'Ae.FromJSON' value from the underlying state using the given
 -- 'Attoparsec.Parser' in order to obtain an 'Ae.Value' first.
 --
--- Returns either the decoded entitiy, or a 'I.DecodingError' in case of error.
---
 -- It returns 'Nothing' if the underlying 'Producer' is exhausted, otherwise
 -- it returns either the decoded entity or a 'I.DecodingError' in case of error.
 decodeL

@@ -43,7 +43,7 @@ encode = PB.fromLazy . Ae.encode
 -- instance, not just 'Ae.Array' or 'Ae.Object'.
 decode
   :: (Monad m, Ae.FromJSON a)
-  => Pipes.Parser B.ByteString m ((Maybe (Either I.DecodingError a))) -- ^
+  => Pipes.Parser B.ByteString m (Maybe (Either I.DecodingError a)) -- ^
 decode = fmap (fmap snd) `liftM` decodeL
 {-# INLINABLE decode #-}
 
@@ -97,4 +97,4 @@ decodedL k p = fmap _encode (k (I.consecutively decodeL p))
 --------------------------------------------------------------------------------
 -- Internal tools --------------------------------------------------------------
 
-type Lens' s a = forall f . Functor f => (a -> f a) -> (s -> f s)
+type Lens' s a = forall f . Functor f => (a -> f a) -> s -> f s
