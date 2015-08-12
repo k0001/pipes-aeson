@@ -1,3 +1,8 @@
+# 0.4.1.4
+
+* Raise upper bound dependency on `aeson`.
+
+
 # 0.4.1.3
 
 * Raise upper bound dependency on `attoparsec`.
