@@ -1,3 +1,10 @@
+# 0.4.1.6
+
+* Raise upper bound dependency on `aeson`.
+
+* Raise upper bound dependency on `transformers`.
+
+
 # 0.4.1.5
 
 * Raise upper bound dependency on `aeson`.
