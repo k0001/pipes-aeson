@@ -1,3 +1,10 @@
+# 0.4.1.7
+
+* Raise upper bound dependency on `aeson`.
+
+* Raise upper bound dependency on `pipes`.
+
+
 # 0.4.1.6
 
 * Raise upper bound dependency on `aeson`.

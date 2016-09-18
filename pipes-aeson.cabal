@@ -1,12 +1,12 @@
 name:               pipes-aeson
-version:            0.4.1.6
+version:            0.4.1.7
 license:            BSD3
 license-file:       LICENSE
 copyright:          Copyright (c) Renzo Carbonara 2013-2016
 author:             Renzo Carbonara
 maintainer:         renzocarbonaraλgmail.com
 stability:          Experimental
-tested-with:        GHC ==7.10.3
+tested-with:        GHC ==7.10.3 GHC ==8.0.1
 homepage:           https://github.com/k0001/pipes-aeson
 bug-reports:        https://github.com/k0001/pipes-aeson/issues
 category:           Pipes, Parser
@@ -30,7 +30,7 @@ library
                    Pipes.Aeson.Unchecked
   other-modules:   Pipes.Aeson.Internal
   build-depends:
-      aeson            (>=0.6.1 && <0.12)
+      aeson            (>=0.6.1 && <1.1)
     , attoparsec       (>=0.10  && <0.14)
     , base             (>=4.5   && <5.0)
     , pipes            (>=4.1   && <4.3)
