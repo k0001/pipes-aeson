@@ -30,7 +30,7 @@ library
                    Pipes.Aeson.Unchecked
   other-modules:   Pipes.Aeson.Internal
   build-depends:
-      aeson            (>=0.6.1 && <1.1)
+      aeson            (>=0.6.1 && <1.2)
     , attoparsec       (>=0.10  && <0.14)
     , base             (>=4.5   && <5.0)
     , pipes            (>=4.1   && <4.4)
