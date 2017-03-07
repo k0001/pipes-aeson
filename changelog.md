@@ -1,3 +1,8 @@
+# 0.4.1.8
+
+* Remove upper bound dependencies on everything but `base`.
+
+
 # 0.4.1.7
 
 * Raise upper bound dependency on `aeson`.
