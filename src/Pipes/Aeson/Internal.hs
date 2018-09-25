@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE RankNTypes         #-}
 
 -- | This module provides internal utilities and it is likely
@@ -10,6 +11,7 @@ module Pipes.Aeson.Internal
   ( DecodingError(..)
   , consecutively
   , decodeL
+  , loopL
   ) where
 import           Control.Exception                (Exception)
 import           Control.Monad.Trans.Error        (Error)
@@ -19,6 +21,7 @@ import qualified Data.Attoparsec.Types            as Attoparsec
 import qualified Data.ByteString                  as B
 import qualified Data.ByteString.Internal         as B (isSpaceWord8)
 import           Data.Data                        (Data, Typeable)
+import           Data.Function                    (fix)
 import           Pipes
 import qualified Pipes.Attoparsec                 as PA
 import qualified Pipes.Parse                      as Pipes
@@ -91,6 +94,42 @@ decodeL parser = do
           Ae.Success a -> Just (Right (n, a))
 {-# INLINABLE decodeL #-}
 
+--------------------------------------------------------------------------------
+
+-- | Repeteadly try to parse raw JSON bytes into @a@ values, reporting any
+-- 'I.DecodingError's downstream as they happen.
+loopL
+  :: (Monad m, Ae.FromJSON a)
+  => Attoparsec.Parser B.ByteString Ae.Value
+  -> (Pipes.Producer B.ByteString m r -> Pipes.Producer B.ByteString m r)
+  -- ^ In case of 'AttoparsecError', this function will be called to modify
+  -- the leftovers 'Pipes.Producer' before using it.
+  --
+  -- Ideally you will want to drop everything until the beginning of the next
+  -- JSON element. This is easy to accomplish if there is a clear whitespace
+  -- delimiter between the JSON elements, such as a newline (i.e.,
+  -- @'Pipes.ByteString.drop' 1 . 'Pipes.ByteString.dropWhile' (/= 0xA)@).
+  -- However, it can be hard to do correctly is there is no such delimiter.
+  -- Skipping the first character (i.e., @'Pipes.ByteString.drop' 1@) should be
+  -- sufficient in most cases, but not when parsing recursive data structures
+  -- because you can accidentally parse a child in its parent's stead.
+  --
+  -- Notice that unless you advance the 'Pipes.Producer' somehow, 'loopL' will
+  -- never terminate.
+  -> Pipes.Producer B.ByteString m r
+  -- ^ Raw JSON input.
+  -> Pipes.Producer' (Either DecodingError (Int, a)) m r
+{-# INLINABLE loopL #-}
+loopL parser fp = fix $ \k p0 -> do
+   (ye, p1) <- lift (S.runStateT (decodeL parser) p0)
+   case ye of
+      Just (Left e@AttoparsecError{}) -> do
+         Pipes.yield (Left e)
+         k (fp p1)
+      Just ea -> Pipes.yield ea >> k p1
+      Nothing -> lift (Pipes.next p1) >>= \case
+         Left r -> pure r
+         Right _ -> error "Pipes.Aeson.Internal.loopL: impossible"
 
 --------------------------------------------------------------------------------
 -- Internal stuff

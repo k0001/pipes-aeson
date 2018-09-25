@@ -24,15 +24,16 @@ module Pipes.Aeson
     -- $decoding
   , decode
   , decoded
+  , loop
     -- ** Including lengths
   , decodeL
   , decodedL
+  , loopL
 
     -- * Types
   , I.DecodingError(..)
   ) where
 
-import           Control.Monad         (liftM)
 import qualified Data.Aeson            as Ae
 import qualified Data.ByteString.Char8 as B
 import           Pipes
@@ -108,7 +109,7 @@ encodeArray = U.encode
 decode
   :: (Monad m, Ae.FromJSON a)
   => Pipes.Parser B.ByteString m (Maybe (Either I.DecodingError a))
-decode = fmap (fmap snd) `liftM` decodeL
+decode = fmap (fmap (fmap snd)) decodeL
 {-# INLINABLE decode #-}
 
 -- | Like 'decode', except it also returns the length of JSON input that was
@@ -172,6 +173,61 @@ decodedL f k p0 = fmap _encode (k (I.consecutively decode p0))
          Right r      -> return r
 {-# INLINABLE decodedL #-}
 
+-- | Repeteadly try to parse raw JSON bytes into @a@ values, reporting any
+-- 'I.DecodingError's downstream as they happen.
+--
+-- /Note:/ The JSON RFC-4627 standard only allows arrays or objects as top-level
+-- entities, which is why these functions restrict their input to them. If you
+-- prefer to ignore the standard and encode any 'Ae.Value', then use 'U.encode'
+-- from the "Pipes.Aeson.Unchecked" module.
+loop
+  :: (Monad m, Ae.FromJSON a)
+  => (Pipes.Producer B.ByteString m r -> Pipes.Producer B.ByteString m r)
+  -- ^ In case of 'I.AttoparsecError', this function will be called to modify
+  -- the leftovers 'Pipes.Producer' before using it.
+  --
+  -- Ideally you will want to drop everything until the beginning of the next
+  -- JSON element. This is easy to accomplish if there is a clear whitespace
+  -- delimiter between the JSON elements, such as a newline (i.e.,
+  -- @'Pipes.ByteString.drop' 1 . 'Pipes.ByteString.dropWhile' (/= 0xA)@).
+  -- However, it can be hard to do correctly is there is no such delimiter.
+  -- Skipping the first character (i.e., @'Pipes.ByteString.drop' 1@) should be
+  -- sufficient in most cases, but not when parsing recursive data structures
+  -- because you can accidentally parse a child in its parent's stead.
+  --
+  -- Notice that unless you advance the 'Pipes.Producer' somehow, 'loop'
+  -- will never terminate.
+  -> Pipes.Producer B.ByteString m r
+  -- ^ Raw JSON input.
+  -> Pipes.Producer' (Either I.DecodingError a) m r
+{-# INLINABLE loop #-}
+loop fp p0 = Pipes.for (loopL fp p0) (Pipes.yield . fmap snd)
+
+-- | Like 'loop', except it also outputs the length of JSON input that was
+-- consumed in order to obtain the value, not including the length of whitespace
+-- before nor after the parsed JSON input.
+loopL
+  :: (Monad m, Ae.FromJSON a)
+  => (Pipes.Producer B.ByteString m r -> Pipes.Producer B.ByteString m r)
+  -- ^ In case of 'I.AttoparsecError', this function will be called to modify
+  -- the leftovers 'Pipes.Producer' before using it.
+  --
+  -- Ideally you will want to drop everything until the beginning of the next
+  -- JSON element. This is easy to accomplish if there is a clear whitespace
+  -- delimiter between the JSON elements, such as a newline (i.e.,
+  -- @'Pipes.ByteString.drop' 1 . 'Pipes.ByteString.dropWhile' (/= 0xA)@).
+  -- However, it can be hard to do correctly is there is no such delimiter.
+  -- Skipping the first character (i.e., @'Pipes.ByteString.drop' 1@) should be
+  -- sufficient in most cases, but not when parsing recursive data structures
+  -- because you can accidentally parse a child in its parent's stead.
+  --
+  -- Notice that unless you advance the 'Pipes.Producer' somehow, 'loopL'
+  -- will never terminate.
+  -> Pipes.Producer B.ByteString m r
+  -- ^ Raw JSON input.
+  -> Pipes.Producer' (Either I.DecodingError (Int, a)) m r
+{-# INLINABLE loopL #-}
+loopL = I.loopL Ae.json'
 
 --------------------------------------------------------------------------------
 -- Internal tools --------------------------------------------------------------

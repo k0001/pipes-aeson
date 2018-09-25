@@ -1,6 +1,8 @@
 # 0.4.2
 
-* `FromJSONError` now carries the failing `Value` as payload.
+* BREAKING CHANGE: `FromJSONError` now carries the failing `Value` as payload.
+
+* Added `loop` and `loopL`.
 
 
 # 0.4.1.8
