@@ -1,3 +1,8 @@
+# 0.4.2
+
+* `FromJSONError` now carries the failing `Value` as payload.
+
+
 # 0.4.1.8
 
 * Remove upper bound dependencies on everything but `base`.

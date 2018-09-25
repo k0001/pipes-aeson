@@ -29,9 +29,9 @@ import qualified Pipes.Parse                      as Pipes
 data DecodingError
   = AttoparsecError PA.ParsingError
     -- ^An @attoparsec@ error that happened while parsing the raw JSON string.
-  | FromJSONError String
-    -- ^An @aeson@ error that happened while trying to convert a
-    -- 'Data.Aeson.Value' to an 'A.FromJSON' instance, as reported by
+  | FromJSONError Ae.Value String
+    -- ^An @aeson@ error that happened while trying to convert the given
+    -- 'Data.Aeson.Value' to an 'Ae.FromJSON' instance, as reported by
     -- 'Data.Aeson.Error'.
   deriving (Show, Eq, Data, Typeable)
 
@@ -54,7 +54,7 @@ instance Error (DecodingError, Producer a m r)
 -- 'Either' return value into an 'Control.Monad.Trans.Error.ErrorT'
 -- monad transformer.
 consecutively
-  :: (Monad m)
+  :: Monad m
   => Pipes.Parser B.ByteString m (Maybe (Either e a))
   -> Producer B.ByteString m r  -- ^Producer from which to draw raw input.
   -> Producer a m (Either (e, Producer B.ByteString m r) r)
@@ -87,7 +87,7 @@ decodeL parser = do
        Nothing             -> Nothing
        Just (Left l)       -> Just (Left (AttoparsecError l))
        Just (Right (n, v)) -> case Ae.fromJSON v of
-          Ae.Error e   -> Just (Left (FromJSONError e))
+          Ae.Error e   -> Just (Left (FromJSONError v e))
           Ae.Success a -> Just (Right (n, a))
 {-# INLINABLE decodeL #-}
 

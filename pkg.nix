@@ -4,7 +4,7 @@
 }:
 mkDerivation {
   pname = "pipes-aeson";
-  version = "0.4.1.8";
+  version = "0.4.2";
   src = ./.;
   libraryHaskellDepends = [
     aeson attoparsec base bytestring pipes pipes-attoparsec

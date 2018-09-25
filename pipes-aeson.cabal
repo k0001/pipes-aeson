@@ -1,12 +1,11 @@
 name:               pipes-aeson
-version:            0.4.1.8
+version:            0.4.2
 license:            BSD3
 license-file:       LICENSE
-copyright:          Copyright (c) Renzo Carbonara 2013-2017
+copyright:          Copyright (c) Renzo Carbonara 2013-2018
 author:             Renzo Carbonara
 maintainer:         renzocarbonaraλgmail.com
 stability:          Experimental
-tested-with:        GHC ==8.0.2
 homepage:           https://github.com/k0001/pipes-aeson
 bug-reports:        https://github.com/k0001/pipes-aeson/issues
 category:           Pipes, Parser
