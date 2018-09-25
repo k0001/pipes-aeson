@@ -14,7 +14,6 @@ module Pipes.Aeson.Internal
   , loopL
   ) where
 import           Control.Exception                (Exception)
-import           Control.Monad.Trans.Error        (Error)
 import qualified Control.Monad.Trans.State.Strict as S
 import qualified Data.Aeson                       as Ae
 import qualified Data.Attoparsec.Types            as Attoparsec
@@ -39,11 +38,6 @@ data DecodingError
   deriving (Show, Eq, Data, Typeable)
 
 instance Exception DecodingError
-instance Error     DecodingError
-
--- | This instance allows using 'Pipes.Lift.errorP' with 'Pipes.Aeson.decoded'
--- and 'Pipes.Aeson.decodedL'
-instance Error (DecodingError, Producer a m r)
 
 --------------------------------------------------------------------------------
 
@@ -53,8 +47,8 @@ instance Error (DecodingError, Producer a m r)
 --
 -- This 'Producer' runs until it either runs out of input or until a decoding
 -- failure occurs, in which case it returns 'Left' with a 'DecodingError' and
--- a 'Producer' with any leftovers. You can use 'Pipes.Lift.errorP' to turn the
--- 'Either' return value into an 'Control.Monad.Trans.Error.ErrorT'
+-- a 'Producer' with any leftovers. You can use 'Pipes.Lift.exceptP' to turn the
+-- 'Either' return value into an 'Control.Monad.Trans.ExceptT'
 -- monad transformer.
 consecutively
   :: Monad m

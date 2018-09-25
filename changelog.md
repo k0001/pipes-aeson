@@ -2,6 +2,8 @@
 
 * BREAKING CHANGE: `FromJSONError` now carries the failing `Value` as payload.
 
+* BREAKING CHANGE: Removed support for `ErrorT`.
+
 * Added `loop` and `loopL`.
 
 
