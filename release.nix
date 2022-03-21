@@ -14,8 +14,8 @@ hsPackageSetConfig = self: super: {
   pipes-aeson = self.callPackage (import ./pkg.nix) {};
 };
 
-ghc802 = pkgs.haskell.packages.ghc902.override {
+hs = pkgs.haskell.packages.ghc902.override {
   packageSetConfig = hsPackageSetConfig;
 };
 
-in { inherit (ghc802) pipes-aeson; }
+in { inherit (hs) pipes-aeson; }
