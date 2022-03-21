@@ -112,7 +112,7 @@ loopL
   -- never terminate.
   -> Pipes.Producer B.ByteString m r
   -- ^ Raw JSON input.
-  -> Pipes.Producer' (Either DecodingError (Int, a)) m r
+  -> Pipes.Proxy x' x () (Either DecodingError (Int, a)) m r
 {-# INLINABLE loopL #-}
 loopL parser fp = fix $ \k p0 -> do
    (ye, p1) <- lift (S.runStateT (decodeL parser) p0)

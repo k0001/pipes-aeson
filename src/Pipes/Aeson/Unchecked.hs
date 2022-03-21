@@ -32,8 +32,9 @@ import qualified Pipes.Parse          as Pipes
 
 -- | Like 'Pipes.Aeson.encode', except it accepts any 'Ae.ToJSON' instance,
 -- not just 'Ae.Array' or 'Ae.Object'.
-encode :: (Monad m, Ae.ToJSON a) => a -> Producer' B.ByteString m ()
-encode = PB.fromLazy . Ae.encode
+-- encode :: (Monad m, Ae.ToJSON a) => a -> Producer' B.ByteString m ()
+encode :: (Monad m, Ae.ToJSON a) => a -> Proxy x' x () PB.ByteString m ()
+encode a = PB.fromLazy (Ae.encode a)
 {-# INLINABLE encode #-}
 {-# RULES "p >-> for cat encode" forall p .
     p >-> for cat encode = for p (\a -> PB.fromLazy (Ae.encode a))
@@ -143,7 +144,7 @@ loopL
   -- will never terminate.
   -> Pipes.Producer B.ByteString m r
   -- ^ Raw JSON input.
-  -> Pipes.Producer' (Either I.DecodingError (Int, a)) m r
+  -> Pipes.Proxy x' x () (Either I.DecodingError (Int, a)) m r
 {-# INLINABLE loopL #-}
 loopL = I.loopL Ae.value'
 

@@ -1,5 +1,5 @@
 { mkDerivation, aeson, attoparsec, base, bytestring, pipes
-, pipes-attoparsec, pipes-bytestring, pipes-parse, stdenv
+, pipes-attoparsec, pipes-bytestring, pipes-parse, lib
 , transformers
 }:
 mkDerivation {
@@ -12,5 +12,5 @@ mkDerivation {
   ];
   homepage = "https://github.com/k0001/pipes-aeson";
   description = "Encode and decode JSON streams using Aeson and Pipes";
-  license = stdenv.lib.licenses.bsd3;
+  license = lib.licenses.bsd3;
 }

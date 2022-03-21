@@ -61,7 +61,7 @@ import qualified Pipes.Parse           as Pipes
 -- @
 -- 'for' 'cat' 'encodeObject' :: 'Monad' m => 'Pipe' 'Ae.Object' 'B.ByteString' m r
 -- @
-encodeObject :: Monad m => Ae.Object -> Producer' B.ByteString m ()
+encodeObject :: Monad m => Ae.Object -> Proxy x' x () B.ByteString m ()
 encodeObject = U.encode
 {-# INLINABLE encodeObject #-}
 {-# RULES "p >-> for cat encodeObject" forall p .
@@ -76,7 +76,7 @@ encodeObject = U.encode
 -- @
 -- 'for' 'cat' 'encodeArray' :: 'Monad' m => 'Pipe' 'Ae.Array' 'B.ByteString' m r
 -- @
-encodeArray :: Monad m => Ae.Array -> Producer' B.ByteString m ()
+encodeArray :: Monad m => Ae.Array -> Proxy x' x () B.ByteString m ()
 encodeArray = U.encode
 {-# INLINABLE encodeArray #-}
 {-# RULES "p >-> for cat encodeArray" forall p .
@@ -225,7 +225,7 @@ loopL
   -- will never terminate.
   -> Pipes.Producer B.ByteString m r
   -- ^ Raw JSON input.
-  -> Pipes.Producer' (Either I.DecodingError (Int, a)) m r
+  -> Pipes.Proxy x' x () (Either I.DecodingError (Int, a)) m r
 {-# INLINABLE loopL #-}
 loopL = I.loopL Ae.json'
 
