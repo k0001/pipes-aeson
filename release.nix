@@ -2,8 +2,8 @@
 , nixpkgs ? (import nixpkgsBootstrap {}).fetchFromGitHub {
     owner = "NixOS";
     repo = "nixpkgs";
-    rev = "b12aacc7c18fb3f29febc842aaa3d0c0e5622546"; # release-17.03
-    sha256 = "1qklmrvfnlk1r6rqxpddllfkv3pihfms370qfsznm959i7hxcv2v"; }
+    rev = "febc24b11ac5369734f81225dc8a200e7dc75319"; # haskell-updates 2022-03-21
+    sha256 = "sha256-JTYxQTU34Xs8tK6fdIWVNOcaAS0p683DknIMq8FnfGg="; }
 }:
 
 let
@@ -14,8 +14,8 @@ hsPackageSetConfig = self: super: {
   pipes-aeson = self.callPackage (import ./pkg.nix) {};
 };
 
-ghc802 = pkgs.haskell.packages.ghc802.override {
+hs = pkgs.haskell.packages.ghc902.override {
   packageSetConfig = hsPackageSetConfig;
 };
 
-in { inherit (ghc802) pipes-aeson; }
+in { inherit (hs) pipes-aeson; }
