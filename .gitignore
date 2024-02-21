@@ -13,3 +13,5 @@ vendor
 \#*
 .\#*
 .shelly
+dist-newstyle
+result

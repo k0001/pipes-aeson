@@ -35,6 +35,7 @@ module Pipes.Aeson
   ) where
 
 import qualified Data.Aeson            as Ae
+import qualified Data.Aeson.Parser     as Ae
 import qualified Data.ByteString.Char8 as B
 import           Pipes
 import qualified Pipes.Aeson.Internal  as I
