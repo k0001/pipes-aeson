@@ -1,10 +1,3 @@
-# 0.4.3
-
-* GHC >= 9.0 compatibility.
-
-* Add dependency on `attoparsec-aeson`.
-
-
 # 0.4.2
 
 * BREAKING CHANGE: `FromJSONError` now carries the failing `Value` as payload.
@@ -12,6 +5,10 @@
 * BREAKING CHANGE: Removed support for `ErrorT`.
 
 * Added `loop` and `loopL`.
+
+* GHC >= 9.0 compatibility.
+
+* Add dependency on `attoparsec-aeson`.
 
 
 # 0.4.1.8
